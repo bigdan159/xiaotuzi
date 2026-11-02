@@ -615,14 +615,14 @@ function renderPosCards(){
   $('#ovPos').innerHTML=pos?posCard(pos):`<div class="empty">${base(cfg.sym)} 空仓 · ${cfg.auto?'自动跟判断书开启，等信号':'自动跟单已关闭'}</div>`;
   const hp=document.getElementById('histPos');if(hp)hp.innerHTML=pos?posCard(pos):'';
 }
-function pill(dir){return`<span class="pill ${dir==='LONG'?'long':dir==='SHORT'?'short':'wait'}">${dir==='LONG'?'做多':dir==='SHORT'?'做空':'观望'}</span>`}
+function pill(dir,go=true){if(!go&&dir!=='WAIT')return`<span class="pill wait">观望（${dir==='LONG'?'偏多':'偏空'}）</span>`;return`<span class="pill ${dir==='LONG'?'long':dir==='SHORT'?'short':'wait'}">${dir==='LONG'?'做多':dir==='SHORT'?'做空':'观望'}</span>`}
 function renderJudge(){
   const j=S.judge;if(!j)return;
-  $('#ovJudge').innerHTML=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${pill(j.dir)}<span class="pill acc">评分 ${j.score}</span><span class="muted" style="font-size:13px">${j.summary}</span></div>
+  $('#ovJudge').innerHTML=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${pill(j.dir,j.go)}<span class="pill acc">评分 ${j.score}</span><span class="muted" style="font-size:13px">${j.summary}</span></div>
    <div class="note" style="margin-top:8px">${j.items.slice(0,2).map(i=>i.t).join('；')}</div>`;
   const col=j.dir==='LONG'?css('--up'):j.dir==='SHORT'?css('--down'):css('--ink-3'),C=2*Math.PI*30;
   $('#ring').innerHTML=`<circle cx="36" cy="36" r="30" fill="none" stroke="${css('--line')}" stroke-width="7"/><circle cx="36" cy="36" r="30" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${C*j.score/100} ${C}" transform="rotate(-90 36 36)"/><text x="36" y="41" text-anchor="middle" font-family="Manrope,sans-serif" font-weight="800" font-size="17" fill="${css('--ink')}">${j.score}</text>`;
-  const v=$('#jVerdict');v.textContent=j.dir==='LONG'?'做多':j.dir==='SHORT'?'做空':'观望';v.style.color=col;
+  const v=$('#jVerdict');v.textContent=j.dir==='WAIT'?'观望':!j.go?(j.dir==='LONG'?'观望（偏多）':'观望（偏空）'):j.dir==='LONG'?'做多':'做空';v.style.color=j.go?col:css('--ink-2');
   $('#jSummary').textContent=j.summary;$('#jTime').textContent=hhmm(j.at)+' 更新';
   const chip=(k,d)=>`<div class="tfchip"><span class="k">${k}</span><span class="v ${d==='LONG'?'up':d==='SHORT'?'down':'muted'}">${dirTxt[d]}</span></div>`;
   $('#tfChips').innerHTML=chip('4h 大方向',j.big)+chip('1h 小时级',j.hour)+chip('15m 入场',j.trig);
