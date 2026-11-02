@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>判断书永续终端</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -46,6 +46,12 @@
   --p50:#7d9bff; --p20:#7cc4ff; --gold:#f0c35a; --pink:#ff7cc4; --violet:#b9a4ff; --warn:#f2b250; --warn-soft:#3a2c14;
   --shadow:0 6px 24px rgba(0,0,0,.35); color-scheme:dark}
 *{box-sizing:border-box}
+html,body{overflow-x:hidden;overscroll-behavior-x:none}
+body{touch-action:manipulation;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-text-size-adjust:100%}
+input,select{font-size:16px!important}
+input{-webkit-user-select:text;user-select:text}
+.installtip{display:flex;gap:10px;align-items:center;font-size:13px;line-height:1.5;background:var(--accent-soft);color:var(--ink);border-radius:14px;padding:10px 12px}
+.installtip button{margin-left:auto;border:0;background:transparent;color:var(--ink-2);font-size:18px;padding:0 4px}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);-webkit-font-smoothing:antialiased;
   background-image:radial-gradient(60% 40% at 0% 0%,var(--wash1),transparent 70%),radial-gradient(50% 35% at 100% 30%,var(--wash2),transparent 70%);
   background-attachment:fixed;min-height:100vh}
@@ -200,6 +206,7 @@ a{color:var(--accent)}
     </div>
     <div class="subtitle" id="viewTitle">总览</div>
     <div class="pricerow"><span class="bigprice num" id="price">—</span><span class="chg num" id="chg">—</span></div>
+    <div class="installtip" id="installTip" hidden><span>在 Safari 里点「分享」→「添加到主屏幕」，从图标打开就没有地址栏，滑动和点按都更像 App。</span><button id="tipX" aria-label="关闭">×</button></div>
     <div class="demobar" id="demoBar" hidden>演示数据：价格是随机生成的，不是真实行情。原因是币安的合约和现货线路都没连上；打开能访问币安的网络（VPN）后，到「配置」点「重新连接币安行情」。</div>
   </header>
 
@@ -621,7 +628,7 @@ function loadLib(i=0){return new Promise(res=>{if(window.LightweightCharts)retur
 function initChart(){
   $('#chartMain').innerHTML='';
   if(!window.LightweightCharts){$('#chartMain').innerHTML='<div class="empty">TradingView 图表引擎三条线路都没连上。换个网络（比如开启你访问币安用的网络）后刷新。<br><button class="btn" id="bLib" style="margin-top:10px">重试</button></div>';const b=document.getElementById('bLib');if(b)b.onclick=()=>loadLib().then(()=>{initChart();setChartData()});return}
-  const LW=LightweightCharts,main=LW.createChart($('#chartMain'),{autoSize:true,...chartTheme()}),sub=LW.createChart($('#chartMacd'),{autoSize:true,...chartTheme(),timeScale:{visible:false,borderVisible:false}});
+  const LW=LightweightCharts,main=LW.createChart($('#chartMain'),{autoSize:true,...chartTheme(),handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false},handleScale:{pinch:true,mouseWheel:true,axisPressedMouseMove:true},kineticScroll:{touch:true,mouse:false}}),sub=LW.createChart($('#chartMacd'),{autoSize:true,...chartTheme(),timeScale:{visible:false,borderVisible:false},handleScroll:false,handleScale:false});
   const up=css('--up'),dn=css('--down');
   const candle=main.addCandlestickSeries({upColor:up,downColor:dn,wickUpColor:up,wickDownColor:dn,borderVisible:false});
   const ln=(c,w=1)=>main.addLineSeries({color:c,lineWidth:w,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
@@ -806,6 +813,15 @@ let resetArm=0;$('#bReset').onclick=e=>{if(Date.now()-resetArm>4000){resetArm=Da
   acct={balance:cfg.start,pos:{},hist:[]};saveAcct();sset(acctKey()+'_seeded',true);e.target.textContent='重置纸面账户';renderAll();toast('纸面账户已重置')};
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(CH){CH.main.applyOptions(chartTheme());CH.sub.applyOptions(chartTheme());setChartData()}renderAll();renderSenti()});
 new MutationObserver(()=>{if(CH){CH.main.applyOptions(chartTheme());CH.sub.applyOptions(chartTheme());setChartData()}renderAll();renderSenti()}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+
+/* ---------- app feel: no page zoom, swipe between tabs ---------- */
+['gesturestart','gesturechange'].forEach(t=>document.addEventListener(t,e=>{if(!e.target.closest('.chartwrap'))e.preventDefault()},{passive:false}));
+const ORDER=['overview','judge','sentiment','history','config'];let sx=0,sy=0,st=0,sOk=false;
+document.addEventListener('touchstart',e=>{const t=e.touches[0];sOk=e.touches.length===1&&!e.target.closest('.chartwrap,.tfs,.seg,input,select');sx=t.clientX;sy=t.clientY;st=Date.now()},{passive:true});
+document.addEventListener('touchend',e=>{if(!sOk)return;const t=e.changedTouches[0],dx=t.clientX-sx,dy=t.clientY-sy;if(Date.now()-st<600&&Math.abs(dx)>70&&Math.abs(dy)<40){const i=ORDER.indexOf(cfg.view)+(dx<0?1:-1);if(i>=0&&i<ORDER.length)show(ORDER[i])}},{passive:true});
+try{const ios=/iPhone|iPad|iPod/.test(navigator.userAgent),standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches;
+  if(ios&&!standalone&&!sget('tipClosed',false)&&location.hostname.endsWith('github.io'))$('#installTip').hidden=false}catch(e){}
+$('#tipX').onclick=()=>{$('#installTip').hidden=true;sset('tipClosed',true)};
 
 /* ---------- loops ---------- */
 setInterval(async()=>{try{if(S.live)await Promise.all([klines(cfg.sym,'4h',300),klines(cfg.sym,'1h',800),klines(cfg.sym,'15m',300)]);runJudge();autoTrade();renderJudge();setPriceLines()}catch(e){}},60000);
