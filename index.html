@@ -619,7 +619,7 @@ function seedDemoHistory(){
 /* ---------- chart ---------- */
 let CH=null;
 function chartTheme(){return{layout:{attributionLogo:true,background:{type:'solid',color:css('--surface')},textColor:css('--ink-2'),fontFamily:'Manrope, -apple-system, PingFang SC, sans-serif',fontSize:11},
-  grid:{vertLines:{color:css('--line')},horzLines:{color:css('--line')}},rightPriceScale:{borderVisible:false},timeScale:{borderVisible:false,timeVisible:true,secondsVisible:false},crosshair:{mode:0}}}
+  grid:{vertLines:{color:css('--line')},horzLines:{color:css('--line')}},rightPriceScale:{borderVisible:false,minimumWidth:78},timeScale:{borderVisible:false,timeVisible:true,secondsVisible:false},crosshair:{mode:0}}}
 const LIB_URLS=['https://cdnjs.cloudflare.com/ajax/libs/lightweight-charts/4.2.0/lightweight-charts.standalone.production.js','https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js','https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js'];
 function loadLib(i=0){return new Promise(res=>{if(window.LightweightCharts)return res(true);if(i>=LIB_URLS.length)return res(false);
   $('#chartMain').innerHTML=`<div class="empty">正在加载 TradingView 图表引擎…（线路 ${i+1}/${LIB_URLS.length}）</div>`;
@@ -628,7 +628,7 @@ function loadLib(i=0){return new Promise(res=>{if(window.LightweightCharts)retur
 function initChart(){
   $('#chartMain').innerHTML='';
   if(!window.LightweightCharts){$('#chartMain').innerHTML='<div class="empty">TradingView 图表引擎三条线路都没连上。换个网络（比如开启你访问币安用的网络）后刷新。<br><button class="btn" id="bLib" style="margin-top:10px">重试</button></div>';const b=document.getElementById('bLib');if(b)b.onclick=()=>loadLib().then(()=>{initChart();setChartData()});return}
-  const LW=LightweightCharts,main=LW.createChart($('#chartMain'),{autoSize:true,...chartTheme(),handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false},handleScale:{pinch:true,mouseWheel:true,axisPressedMouseMove:true},kineticScroll:{touch:true,mouse:false}}),sub=LW.createChart($('#chartMacd'),{autoSize:true,...chartTheme(),timeScale:{visible:false,borderVisible:false},handleScroll:false,handleScale:false});
+  const LW=LightweightCharts,main=LW.createChart($('#chartMain'),{autoSize:true,...chartTheme(),handleScroll:{mouseWheel:true,pressedMouseMove:true,horzTouchDrag:true,vertTouchDrag:false},handleScale:{pinch:true,mouseWheel:true,axisPressedMouseMove:true},kineticScroll:{touch:true,mouse:false}}),sub=LW.createChart($('#chartMacd'),{autoSize:true,...chartTheme(),layout:{...chartTheme().layout,attributionLogo:false},rightPriceScale:{borderVisible:false,minimumWidth:78},timeScale:{visible:false,borderVisible:false},handleScroll:false,handleScale:false});
   const up=css('--up'),dn=css('--down');
   const candle=main.addCandlestickSeries({upColor:up,downColor:dn,wickUpColor:up,wickDownColor:dn,borderVisible:false});
   const ln=(c,w=1)=>main.addLineSeries({color:c,lineWidth:w,priceLineVisible:false,lastValueVisible:false,crosshairMarkerVisible:false});
@@ -811,8 +811,8 @@ let btDays=30;$('#btRange').onclick=e=>{const b=e.target.closest('button');if(!b
 $('#bBt').onclick=()=>runBacktest(btDays);
 let resetArm=0;$('#bReset').onclick=e=>{if(Date.now()-resetArm>4000){resetArm=Date.now();e.target.textContent='再点一次确认重置（清空纸面记录）';setTimeout(()=>e.target.textContent='重置纸面账户',4000);return}
   acct={balance:cfg.start,pos:{},hist:[]};saveAcct();sset(acctKey()+'_seeded',true);e.target.textContent='重置纸面账户';renderAll();toast('纸面账户已重置')};
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(CH){CH.main.applyOptions(chartTheme());CH.sub.applyOptions(chartTheme());setChartData()}renderAll();renderSenti()});
-new MutationObserver(()=>{if(CH){CH.main.applyOptions(chartTheme());CH.sub.applyOptions(chartTheme());setChartData()}renderAll();renderSenti()}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(CH){CH.main.applyOptions(chartTheme());CH.sub.applyOptions({...chartTheme(),layout:{...chartTheme().layout,attributionLogo:false},timeScale:{visible:false,borderVisible:false}});setChartData()}renderAll();renderSenti()});
+new MutationObserver(()=>{if(CH){CH.main.applyOptions(chartTheme());CH.sub.applyOptions({...chartTheme(),layout:{...chartTheme().layout,attributionLogo:false},timeScale:{visible:false,borderVisible:false}});setChartData()}renderAll();renderSenti()}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 
 /* ---------- app feel: no page zoom, swipe between tabs ---------- */
 ['gesturestart','gesturechange'].forEach(t=>document.addEventListener(t,e=>{if(!e.target.closest('.chartwrap'))e.preventDefault()},{passive:false}));
