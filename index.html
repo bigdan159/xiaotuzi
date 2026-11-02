@@ -116,7 +116,19 @@ button{cursor:pointer}
 .fill .l2{font-size:13px;color:var(--ink-2);font-family:var(--f-num);font-variant-numeric:tabular-nums;display:flex;flex-wrap:wrap;gap:2px 6px;align-items:baseline}
 .fill .l2 .v{color:var(--ink);font-size:15px}
 .fill .l3{font-size:12px;color:var(--ink-2);line-height:1.5}
-.kind-open{color:var(--p50)} .kind-close{color:var(--pink)}
+.kind-open{color:var(--p50)} .kind-close{color:var(--pink)} .kind-reduce{color:var(--warn)}
+.seg{display:flex;gap:6px}
+.seg button{flex:1;border:0;background:var(--surface-2);color:var(--ink-2);border-radius:12px;padding:9px 0;font-weight:700;font-size:13px}
+.seg button.on{background:var(--accent-soft);color:var(--accent)}
+.btgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btcol{background:var(--surface-2);border-radius:14px;padding:12px;border:1.5px solid transparent;min-width:0}
+.btcol.on{border-color:var(--violet)}
+.btwr{font-size:30px;font-weight:800;line-height:1.1}
+.btkv{display:grid;grid-template-columns:auto 1fr;gap:5px 8px;font-size:12.5px;margin-top:10px}
+.btkv span{color:var(--ink-2)} .btkv b{text-align:right;font-weight:700}
+.btrow{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px;align-items:center;font-size:12.5px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.btrow:last-child{border-bottom:0}
+.verdictline{font-size:14px;line-height:1.6;padding:10px 12px;border-radius:12px;background:var(--accent-soft)}
 .paper{font-size:11px;color:var(--warn);background:var(--warn-soft);border-radius:5px;padding:1px 5px;font-weight:600}
 .posbox{border:1.5px solid var(--violet);background:linear-gradient(180deg,var(--accent-soft),var(--surface))}
 .empty{text-align:center;color:var(--ink-2);font-size:13px;padding:18px 8px;line-height:1.6}
@@ -242,6 +254,13 @@ a{color:var(--accent)}
         <button class="btn ghost" id="bClose">平掉当前持仓</button>
       </div>
     </div>
+    <div class="card" id="btCard">
+      <h2 class="h2">回测这份判断书 <span class="label" id="btSub"></span></h2>
+      <div class="note" style="margin-top:6px">用过去的真实 K 线，按你现在的配置（开仓线、持仓窗口、手续费、每笔名义），把判断书逐根 15 分钟 K 线回放一遍，模拟自动开平仓。同时对比「一次性止盈」和「分批止盈」。</div>
+      <div class="seg" id="btRange" style="margin-top:12px"><button data-d="30" class="on">30 天</button><button data-d="60">60 天</button><button data-d="90">90 天</button></div>
+      <div class="btnrow" style="margin-top:10px"><button class="btn primary" id="bBt">开始回测</button></div>
+      <div id="btOut" style="margin-top:12px;display:flex;flex-direction:column;gap:12px"></div>
+    </div>
   </section>
 
   <!-- 舆情 -->
@@ -285,7 +304,8 @@ a{color:var(--accent)}
       <div class="field"><label for="cHold">持仓窗口（小时）<small>决定 P50 / P20 区间宽度</small></label><input type="number" id="cHold" min="1" max="48" step="1"></div>
       <div class="field"><label for="cAuto">自动跟判断书开平仓<small>每分钟检查一次，只在纸面执行</small></label><input type="checkbox" class="switch" id="cAuto"></div>
       <div class="field"><label for="cTpsl">自动止盈止损<small>止盈 P50 对侧，止损 P50 外侧</small></label><input type="checkbox" class="switch" id="cTpsl"></div>
-      <div class="field"><label for="cTrail">移动止损<small>浮盈到目标一半时把止损挪过开仓价</small></label><input type="checkbox" class="switch" id="cTrail"></div>
+      <div class="field"><label for="cTrail">移动止损<small>浮盈到目标一半时把止损挪过开仓价（不分批时生效）</small></label><input type="checkbox" class="switch" id="cTrail"></div>
+      <div class="field"><label for="cScale">分批止盈<small>到 P50 先平一半、止损挪到开仓价，剩下的拿到 P20</small></label><input type="checkbox" class="switch" id="cScale"></div>
     </div>
     <div class="card">
       <h2 class="h2">数据与 TradingView</h2>
@@ -335,7 +355,7 @@ const DP={ETHUSDT:2,BTCUSDT:1,SOLUSDT:3};
 function sget(k,d){try{const v=localStorage.getItem('pj_'+k);return v?JSON.parse(v):d}catch(e){return d}}
 function sset(k,v){try{localStorage.setItem('pj_'+k,JSON.stringify(v))}catch(e){}}
 
-const cfg=Object.assign({sym:'ETHUSDT',tf:'1h',view:'overview',notional:400,lev:10,fee:0.05,start:1000,minScore:60,hold:4,auto:true,tpsl:true,trail:true},sget('cfg',{}));
+const cfg=Object.assign({sym:'ETHUSDT',tf:'1h',view:'overview',notional:400,lev:10,fee:0.05,start:1000,minScore:60,hold:4,auto:true,tpsl:true,trail:true,scale:true},sget('cfg',{}));
 const S={src:'demo',diag:[],live:false,kl:{},price:0,chg:0,judge:null,senti:null,ws:null,demoP:{...DEMO_BASE},lastAuto:0};
 let acct=null;
 function acctKey(){return 'acct_'+(S.live?'live':'demo')}
@@ -440,9 +460,8 @@ function onPrice(p,v,fromWs){
 function trendOf(k){const c=k.map(x=>x.c),e20=ema(c,20),e50=ema(c,50),n=c.length-1,sl=e20[n]-e20[n-3];
   if(c[n]>e20[n]&&e20[n]>e50[n]&&sl>0)return'LONG';if(c[n]<e20[n]&&e20[n]<e50[n]&&sl<0)return'SHORT';return'FLAT'}
 const dirTxt={LONG:'偏多',SHORT:'偏空',FLAT:'震荡',WAIT:'观望'};
-function runJudge(){
-  const k4=S.kl[cfg.sym+'4h'],k1=S.kl[cfg.sym+'1h'],k15=S.kl[cfg.sym+'15m'];if(!k4||!k1||!k15)return;
-  const p=S.price,items=[];let score=0;
+function judgeCore(k4,k1,k15,p,o={}){
+  const items=[];let score=0;
   const big=trendOf(k4),hour=trendOf(k1);
   const c15=k15.map(x=>x.c),m15=macd(c15),b15=boll(c15),n15=c15.length-1;
   const trig=m15.hist[n15]>0&&c15[n15]>b15[n15].m?'LONG':m15.hist[n15]<0&&c15[n15]<b15[n15].m?'SHORT':'FLAT';
@@ -452,7 +471,7 @@ function runJudge(){
   else if(big!=='FLAT'&&hour!=='FLAT'){items.push({s:'bad',t:`4h ${dirTxt[big]}，1h ${dirTxt[hour]}，方向打架：不开仓`})}
   else if(big!=='FLAT'&&hour==='FLAT'){items.push({s:'bad',t:`4h ${dirTxt[big]}，但 1h 还在震荡：等小时级跟上再开`})}
   else items.push({s:'bad',t:'4h 与 1h 都在震荡：没有趋势可跟'});
-  // 4h first touch of band
+  if(o.lite&&dir==='WAIT')return{dir,go:false,score:0};
   const c4=k4.map(x=>x.c),b4=boll(c4),n4=c4.length-1;
   const touchLow=i=>k4[i].l<=b4[i].l,touchUp=i=>k4[i].h>=b4[i].u;
   if(dir==='SHORT'&&touchLow(n4)&&![1,2,3].some(j=>touchLow(n4-j))){score-=20;items.push({s:'warn',t:'4h 首次触底：反转风险升高，不宜顺势开空'})}
@@ -465,19 +484,24 @@ function runJudge(){
   if(dir!=='WAIT'){if(trig===dir){score+=20;items.push({s:'ok',t:`15m MACD 与中轨确认${dirTxt[dir]}：入场时机成立`})}else{items.push({s:'warn',t:'15m 还没确认：等 MACD 柱翻色、价格站到中轨另一侧'})}}
   const v1=k1.slice(-21,-1).reduce((a,x)=>a+x.v,0)/20,vNow=k1[k1.length-1].v;
   if(dir!=='WAIT'&&vNow>v1*1.2){score+=5;items.push({s:'ok',t:'1h 成交量放大：趋势有量能配合'})}
-  // levels
   const H=Math.max(1,cfg.hold|0),src=c1.slice(-720),rets=[];for(let i=0;i+H<src.length;i++)rets.push(src[i+H]/src[i]-1);
   const L={p50u:p*(1+quant(rets,.75)),p50d:p*(1+quant(rets,.25)),p20u:p*(1+quant(rets,.9)),p20d:p*(1+quant(rets,.1))};
   const A=atr(k1);let plan=null;
-  if(dir!=='WAIT'){
-    let sl,tp;if(dir==='SHORT'){sl=L.p50u>p?L.p50u+.25*A:p+A;tp=L.p50d<p?L.p50d:p-A}else{sl=L.p50d<p?L.p50d-.25*A:p-A;tp=L.p50u>p?L.p50u:p+A}
-    const rr=Math.abs(tp-p)/Math.abs(sl-p);plan={entry:p,sl,tp,rr};
-    if(rr<.8){score-=10;items.push({s:'warn',t:`盈亏比 ${rr.toFixed(2)} 偏低：止损比目标远`})}
-  }
+  if(dir!=='WAIT'){plan=mkPlan(dir,p,L,A);if(plan.rr<.8){score-=10;items.push({s:'warn',t:`盈亏比 ${plan.rr.toFixed(2)} 偏低：止损比目标远`})}}
   score=Math.max(0,Math.min(100,score));
   const go=dir!=='WAIT'&&score>=cfg.minScore;
   const summary=dir==='WAIT'?'条件不齐，先不出手':go?`评分 ${score}，达到开仓线 ${cfg.minScore}`:`评分 ${score}，没到开仓线 ${cfg.minScore}，只观察`;
-  S.judge={dir,go,score,big,hour,trig,items,L,plan,at:Date.now(),summary,H};
+  return{dir,go,score,big,hour,trig,items,L,plan,summary,H};
+}
+function mkPlan(dir,p,L,A){
+  let sl,tp,tp2;
+  if(dir==='SHORT'){sl=L.p50u>p?L.p50u+.25*A:p+A;tp=L.p50d<p?L.p50d:p-A;tp2=L.p20d<tp?L.p20d:tp-(p-tp)}
+  else{sl=L.p50d<p?L.p50d-.25*A:p-A;tp=L.p50u>p?L.p50u:p+A;tp2=L.p20u>tp?L.p20u:tp+(tp-p)}
+  return{entry:p,sl,tp,tp2,rr:Math.abs(tp-p)/Math.abs(sl-p)};
+}
+function runJudge(){
+  const k4=S.kl[cfg.sym+'4h'],k1=S.kl[cfg.sym+'1h'],k15=S.kl[cfg.sym+'15m'];if(!k4||!k1||!k15)return;
+  S.judge={...judgeCore(k4,k1,k15,S.price),at:Date.now()};
 }
 function autoTrade(){
   if(!cfg.auto||!S.judge)return;const j=S.judge,pos=acct.pos[cfg.sym];
@@ -489,12 +513,18 @@ function autoTrade(){
 function openPos(side,note,plan){
   if(acct.pos[cfg.sym]){toast('已有持仓，先平仓');return}
   const p=S.price,qty=+(cfg.notional/p).toFixed(4),notional=qty*p,fee=notional*cfg.fee/100;
-  let sl=null,tp=null;
-  if(cfg.tpsl){if(plan&&plan.dir!=='x'&&((side==='SHORT'&&plan.sl>p)||(side==='LONG'&&plan.sl<p))){sl=plan.sl;tp=plan.tp}
-    else{const L=S.judge?.L,A=atr(S.kl[cfg.sym+'1h']);if(side==='SHORT'){sl=L&&L.p50u>p?L.p50u+.25*A:p+A;tp=L&&L.p50d<p?L.p50d:p-A}else{sl=L&&L.p50d<p?L.p50d-.25*A:p-A;tp=L&&L.p50u>p?L.p50u:p+A}}}
+  let sl=null,tp=null,tp2=null;
+  if(cfg.tpsl){let P=plan;if(!(P&&((side==='SHORT'&&P.sl>p)||(side==='LONG'&&P.sl<p)))){const L=S.judge?.L||{p50u:p*1.01,p50d:p*.99,p20u:p*1.02,p20d:p*.98};P=mkPlan(side,p,L,atr(S.kl[cfg.sym+'1h']))}
+    sl=P.sl;tp=P.tp;tp2=P.tp2}
   const now=Date.now();
-  const pos={id:now,sym:cfg.sym,side,qty,entry:p,sl,tp,open:now,trailed:false,fills:[{kind:'open',act:side==='LONG'?'买':'卖',qty,price:p,notional,fee,pnl:-fee,time:now,note}]};
+  const pos={id:now,sym:cfg.sym,side,qty,qty0:qty,entry:p,sl,tp,tp2,scale:!!cfg.scale,tp1done:false,open:now,trailed:false,fills:[{kind:'open',act:side==='LONG'?'买':'卖',qty,price:p,notional,fee,pnl:-fee,time:now,note}]};
   acct.pos[cfg.sym]=pos;acct.balance-=fee;saveAcct();renderAll();toast(`纸面开${side==='LONG'?'多':'空'} ${qty} ${base(cfg.sym)} @ ${fp(p)}`);
+}
+function reducePos(sym,frac,note){
+  const pos=acct.pos[sym];if(!pos)return;const p=S.price,q=+(pos.qty*frac).toFixed(4);if(q<=0||q>=pos.qty)return closePos(sym,note);
+  const notional=q*p,fee=notional*cfg.fee/100,gross=(pos.side==='LONG'?p-pos.entry:pos.entry-p)*q;
+  pos.fills.push({kind:'reduce',act:pos.side==='LONG'?'卖':'买',qty:q,price:p,notional,fee,pnl:gross-fee,time:Date.now(),note});
+  pos.qty=+(pos.qty-q).toFixed(4);acct.balance+=gross-fee;saveAcct();renderAll();toast(`${note}：${sg(gross-fee)} USDT`);
 }
 function closePos(sym,note){
   const pos=acct.pos[sym];if(!pos)return;const p=S.price,notional=pos.qty*p,fee=notional*cfg.fee/100;
@@ -505,11 +535,70 @@ function closePos(sym,note){
   toast(`${note}：${sg(gross-fee)} USDT`);
 }
 function checkStops(){
-  const pos=acct&&acct.pos[cfg.sym];if(!pos||pos.sl==null)return;const p=S.price;
-  if(pos.side==='SHORT'){if(p>=pos.sl)return closePos(cfg.sym,pos.trailed?'移动止损':'自动止损');if(pos.tp!=null&&p<=pos.tp)return closePos(cfg.sym,'自动止盈')}
-  else{if(p<=pos.sl)return closePos(cfg.sym,pos.trailed?'移动止损':'自动止损');if(pos.tp!=null&&p>=pos.tp)return closePos(cfg.sym,'自动止盈')}
-  if(cfg.trail&&!pos.trailed&&pos.tp!=null){const goal=Math.abs(pos.tp-pos.entry),got=pos.side==='SHORT'?pos.entry-p:p-pos.entry;
-    if(got>=goal*.5){pos.sl=pos.side==='SHORT'?pos.entry-goal*.2:pos.entry+goal*.2;pos.trailed=true;saveAcct();setPriceLines();toast('移动止损已挪过开仓价')}}
+  const pos=acct&&acct.pos[cfg.sym];if(!pos||pos.sl==null)return;const p=S.price,sh=pos.side==='SHORT';
+  const hitSL=sh?p>=pos.sl:p<=pos.sl,hit=t=>t!=null&&(sh?p<=t:p>=t);
+  if(hitSL)return closePos(cfg.sym,pos.tp1done?'第二批保本离场':pos.trailed?'移动止损':'自动止损');
+  if(pos.scale){
+    if(!pos.tp1done&&hit(pos.tp)){pos.tp1done=true;pos.sl=pos.entry;reducePos(cfg.sym,.5,'分批止盈：先平一半，剩下的止损挪到开仓价');setPriceLines();return}
+    if(pos.tp1done&&hit(pos.tp2))return closePos(cfg.sym,'分批止盈：第二批到 P20');
+    return;
+  }
+  if(hit(pos.tp))return closePos(cfg.sym,'自动止盈');
+  if(cfg.trail&&!pos.trailed&&pos.tp!=null){const goal=Math.abs(pos.tp-pos.entry),got=sh?pos.entry-p:p-pos.entry;
+    if(got>=goal*.5){pos.sl=sh?pos.entry-goal*.2:pos.entry+goal*.2;pos.trailed=true;saveAcct();setPriceLines();toast('移动止损已挪过开仓价')}}
+}
+
+/* ---------- 回测 ---------- */
+async function klinesRange(sym,tf,n,prog){
+  if(!S.live)return genK(sym,tf,n);
+  const lim=S.src==='fapi'?1500:1000;let out=[],end=Date.now();
+  while(out.length<n){const r=await getJSON(`${API}${PFX}/klines?symbol=${sym}&interval=${tf}&limit=${Math.min(lim,n-out.length)}&endTime=${end}`,12000);
+    if(!r.length)break;out=r.map(mapK).concat(out);end=r[0][0]-1;prog&&prog();}
+  return out;
+}
+function btSimulate(sig,k15,scale){
+  const fee=cfg.fee/100,N=cfg.notional,trades=[];let pos=null,lastOpen=-9;
+  const fin=(i,price,note)=>{const g=(pos.side==='LONG'?price-pos.entry:pos.entry-price)*pos.q;pos.pnl+=g-pos.q*price*fee;pos.exit=price;pos.closeT=k15[i].t+9e5;pos.note=note;trades.push(pos);pos=null};
+  for(const s of sig){const i=s.i,b=k15[i];
+    if(pos&&i>pos.i){const sh=pos.side==='SHORT',adv=sh?b.h:b.l,fav=sh?b.l:b.h,reach=t=>sh?fav<=t:fav>=t;
+      if(sh?adv>=pos.sl:adv<=pos.sl)fin(i,pos.sl,pos.tp1done?'保本':'止损');
+      else if(scale){
+        if(!pos.tp1done&&reach(pos.tp)){const q=pos.q/2,g=(sh?pos.entry-pos.tp:pos.tp-pos.entry)*q;pos.pnl+=g-q*pos.tp*fee;pos.q-=q;pos.tp1done=true;pos.sl=pos.entry}
+        if(pos.tp1done&&reach(pos.tp2))fin(i,pos.tp2,'第二批止盈');
+      }else{
+        if(reach(pos.tp))fin(i,pos.tp,'止盈');
+        else if(cfg.trail&&!pos.tr){const goal=Math.abs(pos.tp-pos.entry);if((sh?pos.entry-fav:fav-pos.entry)>=goal*.5){pos.sl=sh?pos.entry-goal*.2:pos.entry+goal*.2;pos.tr=true}}
+      }}
+    if(pos&&s.go&&s.dir!==pos.side)fin(i,b.c,'反向信号');
+    if(!pos&&s.go&&i-lastOpen>=1&&s.plan){const p=b.c,q=N/p;pos={i,side:s.dir,entry:p,q,openT:b.t+9e5,sl:s.plan.sl,tp:s.plan.tp,tp2:s.plan.tp2,pnl:-N*fee,tp1done:false,tr:false};lastOpen=i}
+  }
+  if(pos){const last=k15[k15.length-1];fin(k15.length-1,last.c,'回测结束平仓')}
+  return trades;
+}
+function btStats(tr){
+  const n=tr.length,w=tr.filter(t=>t.pnl>0),l=tr.filter(t=>t.pnl<=0),sw=w.reduce((a,t)=>a+t.pnl,0),sl=l.reduce((a,t)=>a+t.pnl,0);
+  let eq=0,pk=0,dd=0;const curve=[0];for(const t of tr){eq+=t.pnl;pk=Math.max(pk,eq);dd=Math.max(dd,pk-eq);curve.push(eq)}
+  const side=s=>{const a=tr.filter(t=>t.side===s);return{n:a.length,wr:a.length?a.filter(t=>t.pnl>0).length/a.length*100:0}};
+  return{n,wr:n?w.length/n*100:0,total:sw+sl,pf:sl?sw/-sl:(sw>0?Infinity:0),avgW:w.length?sw/w.length:0,avgL:l.length?sl/l.length:0,dd,curve,long:side('LONG'),short:side('SHORT'),hold:n?tr.reduce((a,t)=>a+(t.closeT-t.openT),0)/n/36e5:0};
+}
+async function runBacktest(days){
+  const btn=$('#bBt'),out=$('#btOut');btn.disabled=true;let steps=0;const prog=()=>{out.innerHTML=`<div class="empty">正在下载历史 K 线…（${++steps}）</div>`};
+  try{
+    const sym=cfg.sym,warm=800;
+    const k15=await klinesRange(sym,'15m',days*96+200,prog),k1=await klinesRange(sym,'1h',days*24+warm,prog),k4=await klinesRange(sym,'4h',days*6+220,prog);
+    if(k15.length<300||k1.length<760||k4.length<220)throw new Error('K 线不够');
+    const sig=[];let a=0,b=0;const start=Math.max(200,k15.findIndex(x=>x.t>=k1[750].t));
+    for(let i=start;i<k15.length;i++){
+      const T=k15[i].t+9e5;while(a+1<k1.length&&k1[a+1].t+36e5<=T)a++;while(b+1<k4.length&&k4[b+1].t+144e5<=T)b++;
+      const j=judgeCore(k4.slice(Math.max(0,b-199),b+1),k1.slice(Math.max(0,a-759),a+1),k15.slice(i-199,i+1),k15[i].c,{lite:true});
+      sig.push({i,dir:j.dir,go:j.go,plan:j.plan});
+      if(i%400===0){out.innerHTML=`<div class="empty">正在逐根回放判断书… ${Math.round((i-start)/(k15.length-start)*100)}%</div>`;await new Promise(r=>setTimeout(r,0))}
+    }
+    const A=btStats(btSimulate(sig,k15,false)),B=btSimulate(sig,k15,true),Bs=btStats(B);
+    S.bt={days,A,B:Bs,trades:B,ttA:btSimulate(sig,k15,false),from:k15[start].t,to:k15[k15.length-1].t,sym,demo:!S.live,src:S.src};
+    renderBacktest();
+  }catch(e){out.innerHTML=`<div class="empty">回测没跑完：${e.message||'下载 K 线失败'}。检查网络后再试一次。</div>`}
+  btn.disabled=false;
 }
 const floatPnl=pos=>(pos.side==='LONG'?S.price-pos.entry:pos.entry-S.price)*pos.qty;
 function seedDemoHistory(){
@@ -522,9 +611,9 @@ function seedDemoHistory(){
 
 /* ---------- chart ---------- */
 let CH=null;
-function chartTheme(){return{layout:{background:{type:'solid',color:css('--surface')},textColor:css('--ink-2'),fontFamily:'Manrope, -apple-system, PingFang SC, sans-serif',fontSize:11},
+function chartTheme(){return{layout:{attributionLogo:true,background:{type:'solid',color:css('--surface')},textColor:css('--ink-2'),fontFamily:'Manrope, -apple-system, PingFang SC, sans-serif',fontSize:11},
   grid:{vertLines:{color:css('--line')},horzLines:{color:css('--line')}},rightPriceScale:{borderVisible:false},timeScale:{borderVisible:false,timeVisible:true,secondsVisible:false},crosshair:{mode:0}}}
-const LIB_URLS=['https://cdnjs.cloudflare.com/ajax/libs/lightweight-charts/4.1.3/lightweight-charts.standalone.production.js','https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js','https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js'];
+const LIB_URLS=['https://cdnjs.cloudflare.com/ajax/libs/lightweight-charts/4.2.0/lightweight-charts.standalone.production.js','https://cdn.jsdelivr.net/npm/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js','https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js'];
 function loadLib(i=0){return new Promise(res=>{if(window.LightweightCharts)return res(true);if(i>=LIB_URLS.length)return res(false);
   $('#chartMain').innerHTML=`<div class="empty">正在加载 TradingView 图表引擎…（线路 ${i+1}/${LIB_URLS.length}）</div>`;
   const s=document.createElement('script');s.src=LIB_URLS[i];let done=false;const t=setTimeout(()=>{if(!done){done=true;s.remove();loadLib(i+1).then(res)}},8000);
@@ -565,7 +654,7 @@ function setPriceLines(){
   if(!CH)return;CH.lines.forEach(l=>CH.candle.removePriceLine(l));CH.lines=[];
   const add=(price,color,title,style)=>{if(price!=null&&isFinite(price))CH.lines.push(CH.candle.createPriceLine({price,color,lineWidth:1,lineStyle:style,axisLabelVisible:true,title}))};
   const L=S.judge?.L;if(L){add(L.p50u,css('--p50'),'P50上',0);add(L.p50d,css('--p50'),'P50下',0);add(L.p20u,css('--p20'),'P20上',2);add(L.p20d,css('--p20'),'P20下',2)}
-  const pos=acct.pos[cfg.sym];if(pos){add(pos.entry,css('--p50'),'开仓',1);add(pos.sl,css('--down'),'止损',2);add(pos.tp,css('--up'),'止盈',2)}
+  const pos=acct.pos[cfg.sym];if(pos){add(pos.entry,css('--p50'),'开仓',1);add(pos.sl,css('--down'),'止损',2);add(pos.tp,css('--up'),pos.scale?'止盈1':'止盈',2);if(pos.scale&&!pos.tp1done)add(pos.tp2,css('--up'),'止盈2',2)}
 }
 function setMarkers(){
   if(!CH)return;const k=S.kl[cfg.sym+cfg.tf];if(!k)return;const step=TF_SEC[cfg.tf]*1000,t0=k[0].t;
@@ -608,7 +697,7 @@ function renderEquity(){
 function posCard(pos){const f=floatPnl(pos);return`<div class="fill posbox">
   <div class="l1">${base(pos.sym)} <span style="color:var(--p20)">持仓中</span><span class="pill ${pos.side==='LONG'?'long':'short'}">${pos.side==='LONG'?'多':'空'}</span><span class="t">实时</span></div>
   <div class="l2"><span class="v">${pos.qty} @ ${fp(pos.entry)}</span>· 现价 ${fp(S.price)} · <span class="${pc(f)}" style="font-weight:700">浮盈 ${sg(f)}</span></div>
-  <div class="l2">止损 ${pos.sl!=null?fp(pos.sl):'—'}${pos.trailed?'（已移动）':''} · 止盈 ${pos.tp!=null?fp(pos.tp):'—'} · 保证金 ${fmt(pos.qty*pos.entry/cfg.lev,2)}</div>
+  <div class="l2">止损 ${pos.sl!=null?fp(pos.sl):'—'}${pos.trailed?'（已移动）':''} · 止盈 ${pos.tp!=null?fp(pos.tp):'—'}${pos.scale&&pos.tp2!=null?' / '+fp(pos.tp2):''}${pos.tp1done?'（已平一半）':''} · 保证金 ${fmt(pos.qty*pos.entry/cfg.lev,2)}</div>
   <div class="l3">还没平完，浮盈按现价算，未扣平仓手续费</div></div>`}
 function renderPosCards(){
   const pos=acct.pos[cfg.sym];
@@ -631,7 +720,7 @@ function renderJudge(){
   const L=j.L,rows=[['P20上',L.p20u,'--p20'],['P50上',L.p50u,'--p50'],['现价',S.price,'--accent'],['P50下',L.p50d,'--p50'],['P20下',L.p20d,'--p20']];
   $('#ladder').innerHTML=rows.map(([n,v,c])=>{const pct=(v/S.price-1)*100;return`<div class="rung ${n==='现价'?'now':''}"><span>${n}</span><span class="bar" style="background:var(${c});opacity:${n==='现价'?1:.55};width:${Math.min(100,20+Math.abs(pct)*25)}%"></span><span class="num">${fp(v)} <span class="muted" style="font-size:11px">${n==='现价'?'':(pct>0?'+':'')+pct.toFixed(2)+'%'}</span></span></div>`}).join('');
   const P=j.plan,cell=(k,v,cl='')=>`<div class="stat"><span class="label">${k}</span><b class="${cl}" style="font-size:15px">${v}</b></div>`;
-  $('#plan').innerHTML=P?cell('入场',fp(P.entry))+cell('止损',fp(P.sl),'down')+cell('止盈',fp(P.tp),'up')+cell('盈亏比',P.rr.toFixed(2)):`<div class="empty" style="grid-column:1/-1">观望时不给计划，等方向一致再说</div>`;
+  $('#plan').innerHTML=P?(cfg.scale?cell('止损',fp(P.sl),'down')+cell('止盈1 平一半',fp(P.tp),'up')+cell('止盈2',fp(P.tp2),'up'):cell('入场',fp(P.entry))+cell('止损',fp(P.sl),'down')+cell('止盈',fp(P.tp),'up'))+cell('盈亏比',P.rr.toFixed(2)):`<div class="empty" style="grid-column:1/-1">观望时不给计划，等方向一致再说</div>`;
   const has=!!acct.pos[cfg.sym];$('#bFollow').disabled=!j.go||has;$('#bLong').disabled=has;$('#bShort').disabled=has;$('#bClose').disabled=!has;
   $('#bFollow').textContent=has?'已有持仓':j.go?`按判断书开${j.dir==='LONG'?'多':'空'}（纸面）`:'判断书未达开仓条件';
 }
@@ -641,7 +730,7 @@ function renderHistory(){
   const block=(g,open)=>{const fees=g.fills.reduce((a,f)=>a+f.fee,0),real=g.fills.reduce((a,f)=>a+(f.kind==='close'?f.pnl:-f.fee),0);
     return`<div class="day"><span class="d">${dayLabel(g.open)}</span><span class="num">${hhmm(g.open)} 开仓</span><span class="pill ${g.side==='LONG'?'long':'short'}">${g.side==='LONG'?'多':'空'}</span><span style="color:${open?'var(--p20)':'var(--ink-2)'};font-size:13px">${open?'持仓中':'已平完'}</span><span class="r ${pc(real)}">已实现 ${sg(real)}</span></div>
     <div class="muted" style="font-size:13px;margin-top:-6px">这一笔共 ${g.fills.length} 次成交 · 手续费 ${fmt(fees,2)}${g.demo?' · 示例数据':''}</div>
-    ${[...g.fills].reverse().map(f=>`<div class="fill"><div class="l1">${base(g.sym)} <span class="${f.kind==='open'?'kind-open':'kind-close'}">${f.kind==='open'?'开仓':'平仓'}</span><span class="${f.act==='买'?'up':'down'}">${f.act}</span><span class="paper">纸面</span><span class="t">${hms(f.time)}</span></div>
+    ${[...g.fills].reverse().map(f=>`<div class="fill"><div class="l1">${base(g.sym)} <span class="kind-${f.kind}">${{open:'开仓',close:'平仓',reduce:'减仓'}[f.kind]}</span><span class="${f.act==='买'?'up':'down'}">${f.act}</span><span class="paper">纸面</span><span class="t">${hms(f.time)}</span></div>
     <div class="l2"><span class="v">${f.qty} @ ${fp(f.price)}</span>· 名义 ${fmt(f.notional,2)} · 费 ${fmt(f.fee,2)} · <b class="${pc(f.pnl)}" style="font-size:15px">${sg(f.pnl)}</b></div><div class="l3">${f.note}</div></div>`).join('')}`};
   if(pos)html+=block(pos,true);
   groups.forEach(g=>html+=block(g,false));
@@ -676,6 +765,26 @@ function renderSenti(){
 function renderAll(){renderTicker();renderEquity();renderJudge();renderHistory();setPriceLines();setMarkers();
   $('#tvLink').href=`https://www.tradingview.com/chart/?symbol=BINANCE:${cfg.sym}.P`}
 
+function renderBacktest(){
+  const r=S.bt,out=$('#btOut');if(!r)return;const cur=cfg.scale?r.B:r.A,tr=cfg.scale?r.trades:r.ttA;
+  const d=t=>{const x=new Date(t);return`${x.getMonth()+1}/${x.getDate()} ${hhmm(t)}`};
+  const col=(t,s,on)=>`<div class="btcol ${on?'on':''}"><div class="label">${t}${on?' · 当前设置':''}</div><div class="btwr num ${s.wr>=50?'up':'down'}">${s.n?s.wr.toFixed(0)+'%':'—'}</div><div class="label">胜率</div>
+    <div class="btkv"><span>笔数</span><b class="num">${s.n}</b><span>总盈亏</span><b class="num ${pc(s.total)}">${sg(s.total)}</b><span>盈亏因子</span><b class="num">${isFinite(s.pf)?s.pf.toFixed(2):'∞'}</b><span>最大回撤</span><b class="num down">-${fmt(s.dd,2)}</b></div></div>`;
+  let v;if(cur.n<20)v=`只有 ${cur.n} 笔，样本太少，结论不稳。可以拉长到 90 天，或者在配置里调低开仓线再看。`;
+  else if(cur.total>0&&cur.pf>=1.2)v=`这段时间判断书是赚钱的：胜率 ${cur.wr.toFixed(0)}%，每亏 1 块能赚回 ${cur.pf.toFixed(2)} 块。继续纸面跑，看下个月是否还成立。`;
+  else if(cur.total>0)v=`小幅盈利，但盈亏因子只有 ${cur.pf.toFixed(2)}，扣掉滑点可能就不赚了。先别上实盘。`;
+  else v=`这段时间判断书是亏钱的（胜率 ${cur.wr.toFixed(0)}%）。说明现在的规则还需要调整，不能上实盘。`;
+  out.innerHTML=`${r.demo?'<div class="demobar">这是用演示数据跑的回测，没有参考意义。连上币安后再跑一次。</div>':''}
+   <div class="verdictline">${v}</div>
+   <div class="btgrid">${col('一次性止盈',r.A,!cfg.scale)}${col('分批止盈',r.B,cfg.scale)}</div>
+   <svg class="spark" viewBox="0 0 300 64" preserveAspectRatio="none" aria-label="回测收益曲线">${spark(cur.curve,300,64,cur.total>=0?css('--up'):css('--down'))}</svg>
+   <div class="grid3"><div class="stat"><span class="label">多单</span><b>${cur.long.n} 笔 · ${cur.long.n?cur.long.wr.toFixed(0)+'%':'—'}</b></div><div class="stat"><span class="label">空单</span><b>${cur.short.n} 笔 · ${cur.short.n?cur.short.wr.toFixed(0)+'%':'—'}</b></div><div class="stat"><span class="label">平均持仓</span><b>${cur.hold.toFixed(1)} 小时</b></div></div>
+   <div class="grid2"><div class="stat"><span class="label">平均每笔盈利</span><b class="up">${sg(cur.avgW)}</b></div><div class="stat"><span class="label">平均每笔亏损</span><b class="down">${sg(cur.avgL)}</b></div></div>
+   <div><div class="label" style="margin-bottom:4px">最近 8 笔（${cfg.scale?'分批止盈':'一次性止盈'}）</div>${tr.slice(-8).reverse().map(t=>`<div class="btrow"><span class="num muted">${d(t.openT)}</span>${pill(t.side)}<span class="num">${fp(t.entry)} → ${fp(t.exit)} · ${t.note}</span><b class="num ${pc(t.pnl)}">${sg(t.pnl)}</b></div>`).join('')||'<div class="empty">这段时间判断书一笔都没开</div>'}</div>
+   <div class="note">盈亏因子 = 总盈利 ÷ 总亏损，大于 1 才赚钱。回测用已收盘的 K 线，没算滑点；同一根 K 线里同时碰到止损和止盈时按先止损算（偏保守）。${r.src==='spot'?'这次用的是现货 K 线，和永续略有差别。':''}过去赚钱不代表以后也赚。</div>`;
+  $('#btSub').textContent=`${base(r.sym)} · ${r.days} 天`;
+}
+
 /* ---------- UI wiring ---------- */
 function show(v){cfg.view=v;saveCfg();document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));$('#viewTitle').textContent=VIEWS[v];window.scrollTo(0,0)}
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>show(b.dataset.v));
@@ -689,8 +798,10 @@ $('#bLong').onclick=()=>openPos('LONG','手动开多',null);$('#bShort').onclick
 $('#bClose').onclick=()=>closePos(cfg.sym,'手动平仓');
 const binds=[['cNotional','notional'],['cLev','lev'],['cFee','fee'],['cStart','start'],['cMin','minScore'],['cHold','hold']];
 binds.forEach(([id,k])=>{const el=$('#'+id);el.value=cfg[k];el.onchange=()=>{const v=parseFloat(el.value);if(!isNaN(v)){cfg[k]=v;saveCfg();if(k==='minScore'||k==='hold'){runJudge();renderJudge();setPriceLines()}toast('已保存')}}});
-[['cAuto','auto'],['cTpsl','tpsl'],['cTrail','trail']].forEach(([id,k])=>{const el=$('#'+id);el.checked=cfg[k];el.onchange=()=>{cfg[k]=el.checked;saveCfg();renderPosCards();toast(el.checked?'已开启':'已关闭')}});
+[['cAuto','auto'],['cTpsl','tpsl'],['cTrail','trail'],['cScale','scale']].forEach(([id,k])=>{const el=$('#'+id);el.checked=cfg[k];el.onchange=()=>{cfg[k]=el.checked;saveCfg();renderPosCards();renderJudge();renderBacktest();toast(el.checked?'已开启':'已关闭')}});
 $('#bRetry').onclick=()=>connect();
+let btDays=30;$('#btRange').onclick=e=>{const b=e.target.closest('button');if(!b)return;btDays=+b.dataset.d;document.querySelectorAll('#btRange button').forEach(x=>x.classList.toggle('on',x===b))};
+$('#bBt').onclick=()=>runBacktest(btDays);
 let resetArm=0;$('#bReset').onclick=e=>{if(Date.now()-resetArm>4000){resetArm=Date.now();e.target.textContent='再点一次确认重置（清空纸面记录）';setTimeout(()=>e.target.textContent='重置纸面账户',4000);return}
   acct={balance:cfg.start,pos:{},hist:[]};saveAcct();sset(acctKey()+'_seeded',true);e.target.textContent='重置纸面账户';renderAll();toast('纸面账户已重置')};
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(CH){CH.main.applyOptions(chartTheme());CH.sub.applyOptions(chartTheme());setChartData()}renderAll();renderSenti()});
