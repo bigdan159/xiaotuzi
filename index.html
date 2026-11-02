@@ -134,6 +134,11 @@ button{cursor:pointer}
 .btkv span{color:var(--ink-2)} .btkv b{text-align:right;font-weight:700}
 .btrow{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px;align-items:center;font-size:12.5px;padding:8px 0;border-bottom:1px dashed var(--line)}
 .btrow:last-child{border-bottom:0}
+.opt{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:420px}
+.opt th{font-weight:600;color:var(--ink-2);text-align:left;padding:6px 6px;border-bottom:1px solid var(--line)}
+.opt td{padding:7px 6px;border-bottom:1px dashed var(--line);vertical-align:top;line-height:1.35}
+.opt tr.best td{background:var(--accent-soft)} .opt tr.best td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.opt tr.cur td{outline:1px dashed var(--ink-3);outline-offset:-1px}
 .verdictline{font-size:14px;line-height:1.6;padding:10px 12px;border-radius:12px;background:var(--accent-soft)}
 .paper{font-size:11px;color:var(--warn);background:var(--warn-soft);border-radius:5px;padding:1px 5px;font-weight:600}
 .posbox{border:1.5px solid var(--violet);background:linear-gradient(180deg,var(--accent-soft),var(--surface))}
@@ -268,6 +273,12 @@ a{color:var(--accent)}
       <div class="btnrow" style="margin-top:10px"><button class="btn primary" id="bBt">开始回测</button></div>
       <div id="btOut" style="margin-top:12px;display:flex;flex-direction:column;gap:12px"></div>
     </div>
+    <div class="card">
+      <h2 class="h2">自动找更好的参数</h2>
+      <div class="note" style="margin-top:6px">把 18 组参数各回测一遍：开仓线 60 / 70 / 80，持仓窗口 4 / 8 / 12 小时，加不加「止损后同方向冷却 4 小时 + 盈亏比至少 1」。用前 60 天挑参数，后 30 天检验，防止挑到只是碰巧好看的参数。大约要 30 秒。</div>
+      <div class="btnrow" style="margin-top:12px"><button class="btn primary" id="bOpt">开始寻找</button></div>
+      <div id="optOut" style="margin-top:12px;display:flex;flex-direction:column;gap:12px"></div>
+    </div>
   </section>
 
   <!-- 舆情 -->
@@ -303,6 +314,7 @@ a{color:var(--accent)}
       <div class="field"><label for="cNotional">每笔名义价值<small>USDT，按现价折算数量</small></label><input type="number" id="cNotional" min="10" step="10"></div>
       <div class="field"><label for="cLev">杠杆<small>只影响保证金占用显示</small></label><input type="number" id="cLev" min="1" max="125" step="1"></div>
       <div class="field"><label for="cFee">手续费率 %<small>币安 USDⓈ-M 吃单默认 0.05</small></label><input type="number" id="cFee" min="0" step="0.01"></div>
+      <div class="field"><label for="cRebate">手续费返佣 %<small>比如返佣 30% 就填 30，纸面和回测都按扣掉返佣后的手续费算</small></label><input type="number" id="cRebate" min="0" max="100" step="5"></div>
       <div class="field"><label for="cStart">初始资金<small>重置账户时生效</small></label><input type="number" id="cStart" min="100" step="100"></div>
     </div>
     <div class="card">
@@ -312,6 +324,8 @@ a{color:var(--accent)}
       <div class="field"><label for="cAuto">自动跟判断书开平仓<small>每分钟检查一次，只在纸面执行</small></label><input type="checkbox" class="switch" id="cAuto"></div>
       <div class="field"><label for="cTpsl">自动止盈止损<small>止盈 P50 对侧，止损 P50 外侧</small></label><input type="checkbox" class="switch" id="cTpsl"></div>
       <div class="field"><label for="cTrail">移动止损<small>浮盈到目标一半时把止损挪过开仓价（不分批时生效）</small></label><input type="checkbox" class="switch" id="cTrail"></div>
+      <div class="field"><label for="cCool">止损后冷却（小时）<small>被止损后，这么久之内不再同方向开仓；0 = 不限制</small></label><input type="number" id="cCool" min="0" max="48" step="1"></div>
+      <div class="field"><label for="cRr">最低盈亏比<small>止盈距离 ÷ 止损距离低于它就不开；0 = 不限制</small></label><input type="number" id="cRr" min="0" max="5" step="0.1"></div>
       <div class="field"><label for="cScale">分批止盈<small>到 P50 先平一半、止损挪到开仓价，剩下的拿到 P20</small></label><input type="checkbox" class="switch" id="cScale"></div>
     </div>
     <div class="card">
@@ -362,7 +376,7 @@ const DP={ETHUSDT:2,BTCUSDT:1,SOLUSDT:3};
 function sget(k,d){try{const v=localStorage.getItem('pj_'+k);return v?JSON.parse(v):d}catch(e){return d}}
 function sset(k,v){try{localStorage.setItem('pj_'+k,JSON.stringify(v))}catch(e){}}
 
-const cfg=Object.assign({sym:'ETHUSDT',tf:'1h',view:'overview',notional:400,lev:10,fee:0.05,start:1000,minScore:60,hold:4,auto:true,tpsl:true,trail:true,scale:true},sget('cfg',{}));
+const cfg=Object.assign({sym:'ETHUSDT',tf:'1h',view:'overview',notional:400,lev:10,fee:0.05,start:1000,minScore:60,hold:4,auto:true,tpsl:true,trail:true,scale:true,cool:0,rrMin:0,rebate:0},sget('cfg',{}));
 const S={src:'demo',diag:[],live:false,kl:{},price:0,chg:0,judge:null,senti:null,ws:null,demoP:{...DEMO_BASE},lastAuto:0};
 let acct=null;
 function acctKey(){return 'acct_'+(S.live?'live':'demo')}
@@ -491,7 +505,7 @@ function judgeCore(k4,k1,k15,p,o={}){
   if(dir!=='WAIT'){if(trig===dir){score+=20;items.push({s:'ok',t:`15m MACD 与中轨确认${dirTxt[dir]}：入场时机成立`})}else{items.push({s:'warn',t:'15m 还没确认：等 MACD 柱翻色、价格站到中轨另一侧'})}}
   const v1=k1.slice(-21,-1).reduce((a,x)=>a+x.v,0)/20,vNow=k1[k1.length-1].v;
   if(dir!=='WAIT'&&vNow>v1*1.2){score+=5;items.push({s:'ok',t:'1h 成交量放大：趋势有量能配合'})}
-  const H=Math.max(1,cfg.hold|0),src=c1.slice(-720),rets=[];for(let i=0;i+H<src.length;i++)rets.push(src[i+H]/src[i]-1);
+  const H=Math.max(1,(o.hold??cfg.hold)|0),src=c1.slice(-720),rets=[];for(let i=0;i+H<src.length;i++)rets.push(src[i+H]/src[i]-1);
   const L={p50u:p*(1+quant(rets,.75)),p50d:p*(1+quant(rets,.25)),p20u:p*(1+quant(rets,.9)),p20d:p*(1+quant(rets,.1))};
   const A=atr(k1);let plan=null;
   if(dir!=='WAIT'){plan=mkPlan(dir,p,L,A);if(plan.rr<.8){score-=10;items.push({s:'warn',t:`盈亏比 ${plan.rr.toFixed(2)} 偏低：止损比目标远`})}}
@@ -510,16 +524,23 @@ function runJudge(){
   const k4=S.kl[cfg.sym+'4h'],k1=S.kl[cfg.sym+'1h'],k15=S.kl[cfg.sym+'15m'];if(!k4||!k1||!k15)return;
   S.judge={...judgeCore(k4,k1,k15,S.price),at:Date.now()};
 }
+function feeRate(){return cfg.fee/100*(1-Math.min(100,Math.max(0,cfg.rebate||0))/100)}
+function passFilter(dir,plan,t,lastStop,o){
+  if(o.rrMin&&(!plan||plan.rr<o.rrMin))return false;
+  if(o.cool&&lastStop&&lastStop[dir]&&t-lastStop[dir]<o.cool*36e5)return false;
+  return true;
+}
 function autoTrade(){
   if(!cfg.auto||!S.judge)return;const j=S.judge,pos=acct.pos[cfg.sym];
-  if(pos&&j.go&&j.dir!==pos.side){closePos(cfg.sym,'判断书反向信号');}
-  if(!acct.pos[cfg.sym]&&j.go&&Date.now()-S.lastAuto>15*60e3){S.lastAuto=Date.now();openPos(j.dir,'判断书趋势 '+j.dir+'：'+j.items.filter(x=>x.s!=='bad').map(x=>x.t).join('；'),j.plan)}
+  const ok=j.go&&passFilter(j.dir,j.plan,Date.now(),(acct.lastStop||{})[cfg.sym],cfg);
+  if(pos&&ok&&j.dir!==pos.side){closePos(cfg.sym,'判断书反向信号');}
+  if(!acct.pos[cfg.sym]&&ok&&Date.now()-S.lastAuto>15*60e3){S.lastAuto=Date.now();openPos(j.dir,'判断书趋势 '+j.dir+'：'+j.items.filter(x=>x.s!=='bad').map(x=>x.t).join('；'),j.plan)}
 }
 
 /* ---------- paper engine ---------- */
 function openPos(side,note,plan){
   if(acct.pos[cfg.sym]){toast('已有持仓，先平仓');return}
-  const p=S.price,qty=+(cfg.notional/p).toFixed(4),notional=qty*p,fee=notional*cfg.fee/100;
+  const p=S.price,qty=+(cfg.notional/p).toFixed(4),notional=qty*p,fee=notional*feeRate();
   let sl=null,tp=null,tp2=null;
   if(cfg.tpsl){let P=plan;if(!(P&&((side==='SHORT'&&P.sl>p)||(side==='LONG'&&P.sl<p)))){const L=S.judge?.L||{p50u:p*1.01,p50d:p*.99,p20u:p*1.02,p20d:p*.98};P=mkPlan(side,p,L,atr(S.kl[cfg.sym+'1h']))}
     sl=P.sl;tp=P.tp;tp2=P.tp2}
@@ -529,15 +550,16 @@ function openPos(side,note,plan){
 }
 function reducePos(sym,frac,note){
   const pos=acct.pos[sym];if(!pos)return;const p=S.price,q=+(pos.qty*frac).toFixed(4);if(q<=0||q>=pos.qty)return closePos(sym,note);
-  const notional=q*p,fee=notional*cfg.fee/100,gross=(pos.side==='LONG'?p-pos.entry:pos.entry-p)*q;
+  const notional=q*p,fee=notional*feeRate(),gross=(pos.side==='LONG'?p-pos.entry:pos.entry-p)*q;
   pos.fills.push({kind:'reduce',act:pos.side==='LONG'?'卖':'买',qty:q,price:p,notional,fee,pnl:gross-fee,time:Date.now(),note});
   pos.qty=+(pos.qty-q).toFixed(4);acct.balance+=gross-fee;saveAcct();renderAll();toast(`${note}：${sg(gross-fee)} USDT`);
 }
 function closePos(sym,note){
-  const pos=acct.pos[sym];if(!pos)return;const p=S.price,notional=pos.qty*p,fee=notional*cfg.fee/100;
+  const pos=acct.pos[sym];if(!pos)return;const p=S.price,notional=pos.qty*p,fee=notional*feeRate();
   const gross=(pos.side==='LONG'?p-pos.entry:pos.entry-p)*pos.qty,now=Date.now();
   pos.fills.push({kind:'close',act:pos.side==='LONG'?'卖':'买',qty:pos.qty,price:p,notional,fee,pnl:gross-fee,time:now,note});
   acct.balance+=gross-fee;pos.closed=now;pos.realized=pos.fills.reduce((a,f)=>a+f.pnl,0);
+  if(/止损/.test(note)&&!/保本|移动/.test(note)){acct.lastStop=acct.lastStop||{};(acct.lastStop[sym]=acct.lastStop[sym]||{})[pos.side]=now}
   acct.hist.unshift(pos);delete acct.pos[sym];if(acct.hist.length>300)acct.hist.length=300;saveAcct();renderAll();
   toast(`${note}：${sg(gross-fee)} USDT`);
 }
@@ -563,49 +585,91 @@ async function klinesRange(sym,tf,n,prog){
     if(!r.length)break;out=r.map(mapK).concat(out);end=r[0][0]-1;prog&&prog();}
   return out;
 }
-function btSimulate(sig,k15,scale){
-  const fee=cfg.fee/100,N=cfg.notional,trades=[];let pos=null,lastOpen=-9;
-  const fin=(i,price,note)=>{const g=(pos.side==='LONG'?price-pos.entry:pos.entry-price)*pos.q;pos.pnl+=g-pos.q*price*fee;pos.exit=price;pos.closeT=k15[i].t+9e5;pos.note=note;trades.push(pos);pos=null};
-  for(const s of sig){const i=s.i,b=k15[i];
+function btSimulate(sig,k15,scale,o={}){
+  const fee=feeRate(),N=cfg.notional,trades=[],ms=o.minScore??cfg.minScore,trail=o.trail??cfg.trail,last={};let pos=null,lastOpen=-9;
+  const fin=(i,price,note)=>{const g=(pos.side==='LONG'?price-pos.entry:pos.entry-price)*pos.q,f=pos.q*price*fee;pos.pnl+=g-f;pos.fee+=f;pos.exit=price;pos.closeT=k15[i].t+9e5;pos.note=note;if(note==='止损')last[pos.side]=pos.closeT;trades.push(pos);pos=null};
+  for(const s of sig){const i=s.i,b=k15[i],T=b.t+9e5;
     if(pos&&i>pos.i){const sh=pos.side==='SHORT',adv=sh?b.h:b.l,fav=sh?b.l:b.h,reach=t=>sh?fav<=t:fav>=t;
-      if(sh?adv>=pos.sl:adv<=pos.sl)fin(i,pos.sl,pos.tp1done?'保本':'止损');
+      if(sh?adv>=pos.sl:adv<=pos.sl)fin(i,pos.sl,pos.tp1done?'保本':pos.tr?'移动止损':'止损');
       else if(scale){
-        if(!pos.tp1done&&reach(pos.tp)){const q=pos.q/2,g=(sh?pos.entry-pos.tp:pos.tp-pos.entry)*q;pos.pnl+=g-q*pos.tp*fee;pos.q-=q;pos.tp1done=true;pos.sl=pos.entry}
+        if(!pos.tp1done&&reach(pos.tp)){const q=pos.q/2,g=(sh?pos.entry-pos.tp:pos.tp-pos.entry)*q,f=q*pos.tp*fee;pos.pnl+=g-f;pos.fee+=f;pos.q-=q;pos.tp1done=true;pos.sl=pos.entry}
         if(pos.tp1done&&reach(pos.tp2))fin(i,pos.tp2,'第二批止盈');
       }else{
         if(reach(pos.tp))fin(i,pos.tp,'止盈');
-        else if(cfg.trail&&!pos.tr){const goal=Math.abs(pos.tp-pos.entry);if((sh?pos.entry-fav:fav-pos.entry)>=goal*.5){pos.sl=sh?pos.entry-goal*.2:pos.entry+goal*.2;pos.tr=true}}
+        else if(trail&&!pos.tr){const goal=Math.abs(pos.tp-pos.entry);if((sh?pos.entry-fav:fav-pos.entry)>=goal*.5){pos.sl=sh?pos.entry-goal*.2:pos.entry+goal*.2;pos.tr=true}}
       }}
-    if(pos&&s.go&&s.dir!==pos.side)fin(i,b.c,'反向信号');
-    if(!pos&&s.go&&i-lastOpen>=1&&s.plan){const p=b.c,q=N/p;pos={i,side:s.dir,entry:p,q,openT:b.t+9e5,sl:s.plan.sl,tp:s.plan.tp,tp2:s.plan.tp2,pnl:-N*fee,tp1done:false,tr:false};lastOpen=i}
+    const go=s.dir!=='WAIT'&&s.score>=ms&&passFilter(s.dir,s.plan,T,last,o);
+    if(pos&&go&&s.dir!==pos.side)fin(i,b.c,'反向信号');
+    if(!pos&&go&&i-lastOpen>=1&&s.plan){const p=b.c,q=N/p;pos={i,side:s.dir,entry:p,q,openT:T,sl:s.plan.sl,tp:s.plan.tp,tp2:s.plan.tp2,pnl:-N*fee,fee:N*fee,tp1done:false,tr:false};lastOpen=i}
   }
-  if(pos){const last=k15[k15.length-1];fin(k15.length-1,last.c,'回测结束平仓')}
+  if(pos){fin(k15.length-1,k15[k15.length-1].c,'回测结束平仓')}
   return trades;
+}
+function genSig(k15,k1,k4,hold,from,to){
+  const sig=[];let a=0,b=0;
+  for(let i=from;i<to;i++){const T=k15[i].t+9e5;while(a+1<k1.length&&k1[a+1].t+36e5<=T)a++;while(b+1<k4.length&&k4[b+1].t+144e5<=T)b++;
+    const j=judgeCore(k4.slice(Math.max(0,b-199),b+1),k1.slice(Math.max(0,a-759),a+1),k15.slice(i-199,i+1),k15[i].c,{lite:true,hold});
+    sig.push({i,dir:j.dir,score:j.score,plan:j.plan})}
+  return sig;
 }
 function btStats(tr){
   const n=tr.length,w=tr.filter(t=>t.pnl>0),l=tr.filter(t=>t.pnl<=0),sw=w.reduce((a,t)=>a+t.pnl,0),sl=l.reduce((a,t)=>a+t.pnl,0);
   let eq=0,pk=0,dd=0;const curve=[0];for(const t of tr){eq+=t.pnl;pk=Math.max(pk,eq);dd=Math.max(dd,pk-eq);curve.push(eq)}
   const side=s=>{const a=tr.filter(t=>t.side===s);return{n:a.length,wr:a.length?a.filter(t=>t.pnl>0).length/a.length*100:0}};
-  return{n,wr:n?w.length/n*100:0,total:sw+sl,pf:sl?sw/-sl:(sw>0?Infinity:0),avgW:w.length?sw/w.length:0,avgL:l.length?sl/l.length:0,dd,curve,long:side('LONG'),short:side('SHORT'),hold:n?tr.reduce((a,t)=>a+(t.closeT-t.openT),0)/n/36e5:0};
+  return{fee:tr.reduce((a,t)=>a+(t.fee||0),0),n,wr:n?w.length/n*100:0,total:sw+sl,pf:sl?sw/-sl:(sw>0?Infinity:0),avgW:w.length?sw/w.length:0,avgL:l.length?sl/l.length:0,dd,curve,long:side('LONG'),short:side('SHORT'),hold:n?tr.reduce((a,t)=>a+(t.closeT-t.openT),0)/n/36e5:0};
+}
+async function loadBtData(days,prog){
+  if(S.btData&&S.btData.sym===cfg.sym&&S.btData.days>=days&&S.btData.live===S.live&&Date.now()-S.btData.at<30*60e3)return S.btData;
+  const sym=cfg.sym,k15=await klinesRange(sym,'15m',days*96+200,prog),k1=await klinesRange(sym,'1h',days*24+800,prog),k4=await klinesRange(sym,'4h',days*6+220,prog);
+  if(k15.length<300||k1.length<760||k4.length<220)throw new Error('K 线不够');
+  return S.btData={sym,days,live:S.live,at:Date.now(),k15,k1,k4};
+}
+async function sigChunked(D,hold,out,label,days){
+  const {k15,k1,k4}=D,from=Math.max(200,k15.findIndex(x=>x.t>=k1[750].t),k15.length-days*96),sig=[];
+  for(let s0=from;s0<k15.length;s0+=400){sig.push(...genSig(k15,k1,k4,hold,s0,Math.min(k15.length,s0+400)));out.innerHTML=`<div class="empty">${label} ${Math.round((s0-from)/(k15.length-from)*100)}%</div>`;await new Promise(r=>setTimeout(r,0))}
+  return sig;
 }
 async function runBacktest(days){
-  const btn=$('#bBt'),out=$('#btOut');btn.disabled=true;let steps=0;const prog=()=>{out.innerHTML=`<div class="empty">正在下载历史 K 线…（${++steps}）</div>`};
+  const btn=$('#bBt'),out=$('#btOut');btn.disabled=true;$('#bOpt').disabled=true;let steps=0;const prog=()=>{out.innerHTML=`<div class="empty">正在下载历史 K 线…（${++steps}）</div>`};
   try{
-    const sym=cfg.sym,warm=800;
-    const k15=await klinesRange(sym,'15m',days*96+200,prog),k1=await klinesRange(sym,'1h',days*24+warm,prog),k4=await klinesRange(sym,'4h',days*6+220,prog);
-    if(k15.length<300||k1.length<760||k4.length<220)throw new Error('K 线不够');
-    const sig=[];let a=0,b=0;const start=Math.max(200,k15.findIndex(x=>x.t>=k1[750].t));
-    for(let i=start;i<k15.length;i++){
-      const T=k15[i].t+9e5;while(a+1<k1.length&&k1[a+1].t+36e5<=T)a++;while(b+1<k4.length&&k4[b+1].t+144e5<=T)b++;
-      const j=judgeCore(k4.slice(Math.max(0,b-199),b+1),k1.slice(Math.max(0,a-759),a+1),k15.slice(i-199,i+1),k15[i].c,{lite:true});
-      sig.push({i,dir:j.dir,go:j.go,plan:j.plan});
-      if(i%400===0){out.innerHTML=`<div class="empty">正在逐根回放判断书… ${Math.round((i-start)/(k15.length-start)*100)}%</div>`;await new Promise(r=>setTimeout(r,0))}
-    }
-    const A=btStats(btSimulate(sig,k15,false)),B=btSimulate(sig,k15,true),Bs=btStats(B);
-    S.bt={days,A,B:Bs,trades:B,ttA:btSimulate(sig,k15,false),from:k15[start].t,to:k15[k15.length-1].t,sym,demo:!S.live,src:S.src};
+    const D=await loadBtData(days,prog),sig=await sigChunked(D,cfg.hold,out,'正在逐根回放判断书…',days),k15=D.k15,o={cool:cfg.cool,rrMin:cfg.rrMin};
+    const ttA=btSimulate(sig,k15,false,o),B=btSimulate(sig,k15,true,o);
+    S.bt={days,A:btStats(ttA),B:btStats(B),trades:B,ttA,from:k15[sig[0].i].t,to:k15[k15.length-1].t,sym:cfg.sym,demo:!S.live,src:S.src};
     renderBacktest();
   }catch(e){out.innerHTML=`<div class="empty">回测没跑完：${e.message||'下载 K 线失败'}。检查网络后再试一次。</div>`}
-  btn.disabled=false;
+  btn.disabled=false;$('#bOpt').disabled=false;
+}
+async function runOptimize(){
+  const btn=$('#bOpt'),out=$('#optOut');btn.disabled=true;$('#bBt').disabled=true;let steps=0;const prog=()=>{out.innerHTML=`<div class="empty">正在下载 90 天 K 线…（${++steps}）</div>`};
+  try{
+    const D=await loadBtData(90,prog),k15=D.k15,split=k15[k15.length-1].t-30*864e5,rows=[];
+    for(const hold of [4,8,12]){
+      const sig=await sigChunked(D,hold,out,`正在测试持仓窗口 ${hold} 小时…`,90);
+      const tr=sig.filter(x=>k15[x.i].t<split),te=sig.filter(x=>k15[x.i].t>=split);
+      for(const minScore of [60,70,80])for(const f of [{cool:0,rrMin:0,name:'无过滤'},{cool:4,rrMin:1,name:'冷却+盈亏比≥1'}]){
+        const o={minScore,cool:f.cool,rrMin:f.rrMin};
+        rows.push({hold,minScore,...f,tr:btStats(btSimulate(tr,k15,cfg.scale,o)),te:btStats(btSimulate(te,k15,cfg.scale,o))});
+      }
+    }
+    S.opt={rows,demo:!S.live};renderOptimize();
+  }catch(e){out.innerHTML=`<div class="empty">没跑完：${e.message||'下载 K 线失败'}。检查网络后再试一次。</div>`}
+  btn.disabled=false;$('#bBt').disabled=false;
+}
+function renderOptimize(){
+  const r=S.opt,out=$('#optOut');if(!r)return;
+  const rows=[...r.rows].sort((a,b)=>b.tr.total-a.tr.total),best=rows.find(x=>x.tr.n>=20)||rows[0];
+  const isCur=x=>x.hold===cfg.hold&&x.minScore===cfg.minScore&&x.cool===cfg.cool&&x.rrMin===cfg.rrMin;
+  const cell=s=>`<span class="${s.n?pc(s.total):'muted'}">${s.n?s.wr.toFixed(0)+'% · '+sg(s.total):'没开单'}</span><br><span class="muted">${s.n} 笔</span>`;
+  let v;if(best.tr.total<=0)v='18 组参数在前 60 天全都亏钱。光调参数救不了，问题在判断书的规则本身，下一步要改逻辑。';
+  else if(best.te.total>0)v=`前 60 天最好的一组，到后 30 天也还在赚（${sg(best.te.total)}）。可以采用，继续纸面跑验证。`;
+  else v=`前 60 天最好的一组，到后 30 天就亏了（${sg(best.te.total)}）。说明它只是碰巧适合过去那段行情，不能信，下一步要改判断书的逻辑。`;
+  out.innerHTML=`${r.demo?'<div class="demobar">演示数据跑的结果，没有参考意义。</div>':''}<div class="verdictline">${v}</div>
+  <div style="overflow-x:auto"><table class="opt"><thead><tr><th>开仓线</th><th>窗口</th><th>过滤</th><th>前 60 天（找参数）</th><th>后 30 天（检验）</th></tr></thead><tbody>
+  ${rows.slice(0,8).concat(rows.slice(8).filter(isCur)).map(x=>`<tr class="${x===best?'best':''} ${isCur(x)?'cur':''}"><td>${x.minScore}</td><td>${x.hold}h</td><td>${x.name}</td><td>${cell(x.tr)}</td><td>${cell(x.te)}</td></tr>`).join('')}</tbody></table></div>
+  <div class="note">紫框是前 60 天最好的一组，虚线是你现在用的设置。只在前 60 天里挑参数，再看它在没参与挑选的后 30 天表现如何，这样才能判断它是真的好还是碰巧。</div>
+  ${best.tr.total>0&&best.te.total>0&&!isCur(best)?`<div class="btnrow"><button class="btn primary" id="bApply">采用这组：开仓线 ${best.minScore} · 窗口 ${best.hold}h · ${best.name}</button></div>`:''}`;
+  const ap=document.getElementById('bApply');if(ap)ap.onclick=()=>{Object.assign(cfg,{minScore:best.minScore,hold:best.hold,cool:best.cool,rrMin:best.rrMin});saveCfg();
+    [['cMin','minScore'],['cHold','hold'],['cCool','cool'],['cRr','rrMin']].forEach(([id,k])=>$('#'+id).value=cfg[k]);runJudge();renderJudge();setPriceLines();renderOptimize();toast('已采用新参数')};
 }
 const floatPnl=pos=>(pos.side==='LONG'?S.price-pos.entry:pos.entry-S.price)*pos.qty;
 function seedDemoHistory(){
@@ -776,7 +840,7 @@ function renderBacktest(){
   const r=S.bt,out=$('#btOut');if(!r)return;const cur=cfg.scale?r.B:r.A,tr=cfg.scale?r.trades:r.ttA;
   const d=t=>{const x=new Date(t);return`${x.getMonth()+1}/${x.getDate()} ${hhmm(t)}`};
   const col=(t,s,on)=>`<div class="btcol ${on?'on':''}"><div class="label">${t}${on?' · 当前设置':''}</div><div class="btwr num ${s.wr>=50?'up':'down'}">${s.n?s.wr.toFixed(0)+'%':'—'}</div><div class="label">胜率</div>
-    <div class="btkv"><span>笔数</span><b class="num">${s.n}</b><span>总盈亏</span><b class="num ${pc(s.total)}">${sg(s.total)}</b><span>盈亏因子</span><b class="num">${isFinite(s.pf)?s.pf.toFixed(2):'∞'}</b><span>最大回撤</span><b class="num down">-${fmt(s.dd,2)}</b></div></div>`;
+    <div class="btkv"><span>笔数</span><b class="num">${s.n}</b><span>总盈亏</span><b class="num ${pc(s.total)}">${sg(s.total)}</b><span>盈亏因子</span><b class="num">${isFinite(s.pf)?s.pf.toFixed(2):'∞'}</b><span>最大回撤</span><b class="num down">-${fmt(s.dd,2)}</b><span>手续费</span><b class="num muted">-${fmt(s.fee,2)}</b></div></div>`;
   let v;if(cur.n<20)v=`只有 ${cur.n} 笔，样本太少，结论不稳。可以拉长到 90 天，或者在配置里调低开仓线再看。`;
   else if(cur.total>0&&cur.pf>=1.2)v=`这段时间判断书是赚钱的：胜率 ${cur.wr.toFixed(0)}%，每亏 1 块能赚回 ${cur.pf.toFixed(2)} 块。继续纸面跑，看下个月是否还成立。`;
   else if(cur.total>0)v=`小幅盈利，但盈亏因子只有 ${cur.pf.toFixed(2)}，扣掉滑点可能就不赚了。先别上实盘。`;
@@ -803,12 +867,13 @@ $('#sym').value=cfg.sym;$('#sym').onchange=e=>{cfg.sym=e.target.value;saveCfg();
 $('#bFollow').onclick=()=>{const j=S.judge;if(j&&j.go)openPos(j.dir,'判断书趋势 '+j.dir+'（手动确认）：'+j.items.filter(x=>x.s!=='bad').map(x=>x.t).join('；'),j.plan)};
 $('#bLong').onclick=()=>openPos('LONG','手动开多',null);$('#bShort').onclick=()=>openPos('SHORT','手动开空',null);
 $('#bClose').onclick=()=>closePos(cfg.sym,'手动平仓');
-const binds=[['cNotional','notional'],['cLev','lev'],['cFee','fee'],['cStart','start'],['cMin','minScore'],['cHold','hold']];
+const binds=[['cNotional','notional'],['cLev','lev'],['cFee','fee'],['cStart','start'],['cMin','minScore'],['cHold','hold'],['cCool','cool'],['cRr','rrMin'],['cRebate','rebate']];
 binds.forEach(([id,k])=>{const el=$('#'+id);el.value=cfg[k];el.onchange=()=>{const v=parseFloat(el.value);if(!isNaN(v)){cfg[k]=v;saveCfg();if(k==='minScore'||k==='hold'){runJudge();renderJudge();setPriceLines()}toast('已保存')}}});
 [['cAuto','auto'],['cTpsl','tpsl'],['cTrail','trail'],['cScale','scale']].forEach(([id,k])=>{const el=$('#'+id);el.checked=cfg[k];el.onchange=()=>{cfg[k]=el.checked;saveCfg();renderPosCards();renderJudge();renderBacktest();toast(el.checked?'已开启':'已关闭')}});
 $('#bRetry').onclick=()=>connect();
 let btDays=30;$('#btRange').onclick=e=>{const b=e.target.closest('button');if(!b)return;btDays=+b.dataset.d;document.querySelectorAll('#btRange button').forEach(x=>x.classList.toggle('on',x===b))};
 $('#bBt').onclick=()=>runBacktest(btDays);
+$('#bOpt').onclick=()=>runOptimize();
 let resetArm=0;$('#bReset').onclick=e=>{if(Date.now()-resetArm>4000){resetArm=Date.now();e.target.textContent='再点一次确认重置（清空纸面记录）';setTimeout(()=>e.target.textContent='重置纸面账户',4000);return}
   acct={balance:cfg.start,pos:{},hist:[]};saveAcct();sset(acctKey()+'_seeded',true);e.target.textContent='重置纸面账户';renderAll();toast('纸面账户已重置')};
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(CH){CH.main.applyOptions(chartTheme());CH.sub.applyOptions({...chartTheme(),layout:{...chartTheme().layout,attributionLogo:false},timeScale:{visible:false,borderVisible:false}});setChartData()}renderAll();renderSenti()});
