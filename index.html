@@ -134,7 +134,7 @@ button{cursor:pointer}
 .btkv span{color:var(--ink-2)} .btkv b{text-align:right;font-weight:700}
 .btrow{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px;align-items:center;font-size:12.5px;padding:8px 0;border-bottom:1px dashed var(--line)}
 .btrow:last-child{border-bottom:0}
-.opt{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:420px}
+.opt{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:500px}
 .opt th{font-weight:600;color:var(--ink-2);text-align:left;padding:6px 6px;border-bottom:1px solid var(--line)}
 .opt td{padding:7px 6px;border-bottom:1px dashed var(--line);vertical-align:top;line-height:1.35}
 .opt tr.best td{background:var(--accent-soft)} .opt tr.best td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
@@ -275,7 +275,7 @@ a{color:var(--accent)}
     </div>
     <div class="card">
       <h2 class="h2">自动找更好的参数</h2>
-      <div class="note" style="margin-top:6px">把 18 组参数各回测一遍：开仓线 60 / 70 / 80，持仓窗口 4 / 8 / 12 小时，加不加「止损后同方向冷却 4 小时 + 盈亏比至少 1」。用前 60 天挑参数，后 30 天检验，防止挑到只是碰巧好看的参数。大约要 30 秒。</div>
+      <div class="note" style="margin-top:6px">把三种策略（趋势跟随、区间回归、自动切换）和不同的开仓线、持仓窗口、过滤条件组合起来，一共 36 组，各回测一遍。用前 60 天挑参数，后 30 天检验，防止挑到只是碰巧好看的参数。大约要 1 分钟。</div>
       <div class="btnrow" style="margin-top:12px"><button class="btn primary" id="bOpt">开始寻找</button></div>
       <div id="optOut" style="margin-top:12px;display:flex;flex-direction:column;gap:12px"></div>
     </div>
@@ -319,6 +319,7 @@ a{color:var(--accent)}
     </div>
     <div class="card">
       <h2 class="h2">判断书与风控</h2>
+      <div class="field"><label for="cMode">策略模式<small>趋势跟随：顺着方向追；区间回归：冲出布林带后博回到中轨；自动切换：按 ADX 判断行情选一种</small></label><select id="cMode" style="border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--surface-2)"><option value="trend">趋势跟随</option><option value="revert">区间回归</option><option value="auto">自动切换</option></select></div>
       <div class="field"><label for="cMin">最低开仓评分<small>判断书评分达到才开仓</small></label><input type="number" id="cMin" min="0" max="100" step="5"></div>
       <div class="field"><label for="cHold">持仓窗口（小时）<small>决定 P50 / P20 区间宽度</small></label><input type="number" id="cHold" min="1" max="48" step="1"></div>
       <div class="field"><label for="cAuto">自动跟判断书开平仓<small>每分钟检查一次，只在纸面执行</small></label><input type="checkbox" class="switch" id="cAuto"></div>
@@ -376,7 +377,7 @@ const DP={ETHUSDT:2,BTCUSDT:1,SOLUSDT:3};
 function sget(k,d){try{const v=localStorage.getItem('pj_'+k);return v?JSON.parse(v):d}catch(e){return d}}
 function sset(k,v){try{localStorage.setItem('pj_'+k,JSON.stringify(v))}catch(e){}}
 
-const cfg=Object.assign({sym:'ETHUSDT',tf:'1h',view:'overview',notional:400,lev:10,fee:0.05,start:1000,minScore:60,hold:4,auto:true,tpsl:true,trail:true,scale:true,cool:0,rrMin:0,rebate:0},sget('cfg',{}));
+const cfg=Object.assign({sym:'ETHUSDT',tf:'1h',view:'overview',notional:400,lev:10,fee:0.05,start:1000,minScore:60,hold:4,auto:true,tpsl:true,trail:true,scale:true,cool:0,rrMin:0,rebate:0,mode:'trend'},sget('cfg',{}));
 const S={src:'demo',diag:[],live:false,kl:{},price:0,chg:0,judge:null,senti:null,ws:null,demoP:{...DEMO_BASE},lastAuto:0};
 let acct=null;
 function acctKey(){return 'acct_'+(S.live?'live':'demo')}
@@ -481,7 +482,7 @@ function onPrice(p,v,fromWs){
 function trendOf(k){const c=k.map(x=>x.c),e20=ema(c,20),e50=ema(c,50),n=c.length-1,sl=e20[n]-e20[n-3];
   if(c[n]>e20[n]&&e20[n]>e50[n]&&sl>0)return'LONG';if(c[n]<e20[n]&&e20[n]<e50[n]&&sl<0)return'SHORT';return'FLAT'}
 const dirTxt={LONG:'偏多',SHORT:'偏空',FLAT:'震荡',WAIT:'观望'};
-function judgeCore(k4,k1,k15,p,o={}){
+function judgeTrend(k4,k1,k15,p,o={}){
   const items=[];let score=0;
   const big=trendOf(k4),hour=trendOf(k1);
   const c15=k15.map(x=>x.c),m15=macd(c15),b15=boll(c15),n15=c15.length-1;
@@ -505,14 +506,55 @@ function judgeCore(k4,k1,k15,p,o={}){
   if(dir!=='WAIT'){if(trig===dir){score+=20;items.push({s:'ok',t:`15m MACD 与中轨确认${dirTxt[dir]}：入场时机成立`})}else{items.push({s:'warn',t:'15m 还没确认：等 MACD 柱翻色、价格站到中轨另一侧'})}}
   const v1=k1.slice(-21,-1).reduce((a,x)=>a+x.v,0)/20,vNow=k1[k1.length-1].v;
   if(dir!=='WAIT'&&vNow>v1*1.2){score+=5;items.push({s:'ok',t:'1h 成交量放大：趋势有量能配合'})}
-  const H=Math.max(1,(o.hold??cfg.hold)|0),src=c1.slice(-720),rets=[];for(let i=0;i+H<src.length;i++)rets.push(src[i+H]/src[i]-1);
-  const L={p50u:p*(1+quant(rets,.75)),p50d:p*(1+quant(rets,.25)),p20u:p*(1+quant(rets,.9)),p20d:p*(1+quant(rets,.1))};
+  const H=Math.max(1,(o.hold??cfg.hold)|0),L=levelsOf(c1,p,H);
   const A=atr(k1);let plan=null;
   if(dir!=='WAIT'){plan=mkPlan(dir,p,L,A);if(plan.rr<.8){score-=10;items.push({s:'warn',t:`盈亏比 ${plan.rr.toFixed(2)} 偏低：止损比目标远`})}}
   score=Math.max(0,Math.min(100,score));
-  const go=dir!=='WAIT'&&score>=cfg.minScore;
-  const summary=dir==='WAIT'?'条件不齐，先不出手':go?`评分 ${score}，达到开仓线 ${cfg.minScore}`:`评分 ${score}，没到开仓线 ${cfg.minScore}，只观察`;
-  return{dir,go,score,big,hour,trig,items,L,plan,summary,H};
+  const ms=o.minScore??cfg.minScore,go=dir!=='WAIT'&&score>=ms;
+  const summary=dir==='WAIT'?'条件不齐，先不出手':go?`评分 ${score}，达到开仓线 ${ms}`:`评分 ${score}，没到开仓线 ${ms}，只观察`;
+  const cc=d=>d==='LONG'?'up':d==='SHORT'?'down':'muted';
+  return{dir,go,score,big,hour,trig,items,L,plan,summary,H,chips:[{k:'4h 大方向',v:dirTxt[big],c:cc(big)},{k:'1h 小时级',v:dirTxt[hour],c:cc(hour)},{k:'15m 入场',v:dirTxt[trig],c:cc(trig)}]};
+}
+function adx(k,n=14){let tr=0,pd=0,md=0,ad=0;
+  for(let i=1;i<k.length;i++){const up=k[i].h-k[i-1].h,dn=k[i-1].l-k[i].l,P=up>dn&&up>0?up:0,M=dn>up&&dn>0?dn:0,T=Math.max(k[i].h-k[i].l,Math.abs(k[i].h-k[i-1].c),Math.abs(k[i].l-k[i-1].c));
+    if(i<=n){tr+=T;pd+=P;md+=M}else{tr=tr-tr/n+T;pd=pd-pd/n+P;md=md-md/n+M}
+    if(i>=n){const a=100*pd/(tr||1),b=100*md/(tr||1),dx=100*Math.abs(a-b)/((a+b)||1);ad=i===n?dx:(ad*(n-1)+dx)/n}}
+  return ad}
+function levelsOf(c1,p,H){const src=c1.slice(-720),rets=[];for(let i=0;i+H<src.length;i++)rets.push(src[i+H]/src[i]-1);
+  return{p50u:p*(1+quant(rets,.75)),p50d:p*(1+quant(rets,.25)),p20u:p*(1+quant(rets,.9)),p20d:p*(1+quant(rets,.1))}}
+function judgeRevert(k4,k1,k15,p,o={}){
+  const items=[];let score=0,dir='WAIT';
+  const c1=k1.map(x=>x.c),n1=c1.length-1,B=boll(c1)[n1],A=o.adx??adx(k1),R1=rsi(c1)[n1];
+  const c15=k15.map(x=>x.c),r15=rsi(c15),n15=c15.length-1,R15=r15[n15],R15p=r15[n15-1],big=trendOf(k4);
+  const where=p>=B.u?'UP':p<=B.l?'DN':'IN';
+  if(A>=25)items.push({s:'bad',t:`1h ADX ${A.toFixed(0)}：正在走趋势，不做区间回归`});
+  else if(where==='IN')items.push({s:'bad',t:'价格在 1h 布林带里面：没到区间边缘，不出手'});
+  else{dir=where==='UP'?'SHORT':'LONG';score+=45;items.push({s:'ok',t:`1h ADX ${A.toFixed(0)} 震荡，价格${where==='UP'?'冲出上轨：博回落':'跌破下轨：博反弹'}`});
+    if(A<20){score+=10;items.push({s:'ok',t:'ADX 低于 20：震荡特征明显'})}
+    if((dir==='SHORT'&&R1>65)||(dir==='LONG'&&R1<35)){score+=15;items.push({s:'ok',t:`1h RSI ${R1.toFixed(0)}：${dir==='SHORT'?'超买':'超卖'}`})}else items.push({s:'warn',t:`1h RSI ${R1.toFixed(0)}：还不够极端`});
+    const turn=dir==='SHORT'?(R15<R15p&&R15p>60):(R15>R15p&&R15p<40);
+    if(turn){score+=20;items.push({s:'ok',t:`15m RSI 拐头：开始${dir==='SHORT'?'回落':'反弹'}`})}else items.push({s:'warn',t:'15m RSI 还没拐头：等它掉头再进'});
+    if((dir==='SHORT'&&big==='LONG')||(dir==='LONG'&&big==='SHORT')){score-=25;items.push({s:'warn',t:`4h ${dirTxt[big]}：逆着大方向做回归，风险大`})}else{score+=10;items.push({s:'ok',t:'4h 没有反向的大趋势'})}
+  }
+  if(o.lite&&dir==='WAIT')return{dir,go:false,score:0};
+  const H=Math.max(1,(o.hold??cfg.hold)|0),L=levelsOf(c1,p,H),at=atr(k1);let plan=null;
+  if(dir!=='WAIT'){let sl,tp,tp2;if(dir==='SHORT'){sl=p+at;tp=B.m;tp2=B.m-.5*(B.u-B.m)}else{sl=p-at;tp=B.m;tp2=B.m+.5*(B.m-B.l)}
+    plan={entry:p,sl,tp,tp2,rr:Math.abs(tp-p)/Math.abs(sl-p)};if(plan.rr<.8){score-=10;items.push({s:'warn',t:`盈亏比 ${plan.rr.toFixed(2)} 偏低：中轨离得太近`})}}
+  score=Math.max(0,Math.min(100,score));const go=dir!=='WAIT'&&score>=(o.minScore??cfg.minScore);
+  const summary=dir==='WAIT'?'条件不齐，先不出手':go?`评分 ${score}，达到开仓线 ${o.minScore??cfg.minScore}`:`评分 ${score}，没到开仓线 ${o.minScore??cfg.minScore}，只观察`;
+  return{dir,go,score,items,L,plan,summary,H,chips:[{k:'1h ADX',v:A.toFixed(0),c:A<20?'up':A>=25?'down':'muted'},{k:'1h 布林位置',v:{UP:'上轨外',DN:'下轨外',IN:'带内'}[where],c:where==='IN'?'muted':where==='UP'?'down':'up'},{k:'15m RSI',v:R15.toFixed(0),c:R15>70?'down':R15<30?'up':'muted'}]};
+}
+const MODES={trend:'趋势跟随',revert:'区间回归',auto:'自动切换'};
+function judgeCore(k4,k1,k15,p,o={}){
+  const mode=o.mode||cfg.mode||'trend';
+  if(mode==='trend')return judgeTrend(k4,k1,k15,p,o);
+  if(mode==='revert')return judgeRevert(k4,k1,k15,p,o);
+  const A=adx(k1);
+  if(A>=25){const j=judgeTrend(k4,k1,k15,p,o);if(j.items)j.items.unshift({s:'ok',t:`1h ADX ${A.toFixed(0)} ≥ 25：趋势行情，用趋势跟随`});return j}
+  if(A<20){const j=judgeRevert(k4,k1,k15,p,{...o,adx:A});if(j.items)j.items.unshift({s:'ok',t:`1h ADX ${A.toFixed(0)} < 20：震荡行情，用区间回归`});return j}
+  if(o.lite)return{dir:'WAIT',go:false,score:0};
+  const j=judgeTrend(k4,k1,k15,p,o);
+  return{...j,dir:'WAIT',go:false,score:0,plan:null,summary:'行情性质不明，先不出手',items:[{s:'bad',t:`1h ADX ${A.toFixed(0)} 在 20～25 之间：既不是明显趋势也不是明显震荡，不出手`}]};
 }
 function mkPlan(dir,p,L,A){
   let sl,tp,tp2;
@@ -605,10 +647,10 @@ function btSimulate(sig,k15,scale,o={}){
   if(pos){fin(k15.length-1,k15[k15.length-1].c,'回测结束平仓')}
   return trades;
 }
-function genSig(k15,k1,k4,hold,from,to){
+function genSig(k15,k1,k4,hold,from,to,mode){
   const sig=[];let a=0,b=0;
   for(let i=from;i<to;i++){const T=k15[i].t+9e5;while(a+1<k1.length&&k1[a+1].t+36e5<=T)a++;while(b+1<k4.length&&k4[b+1].t+144e5<=T)b++;
-    const j=judgeCore(k4.slice(Math.max(0,b-199),b+1),k1.slice(Math.max(0,a-759),a+1),k15.slice(i-199,i+1),k15[i].c,{lite:true,hold});
+    const j=judgeCore(k4.slice(Math.max(0,b-199),b+1),k1.slice(Math.max(0,a-759),a+1),k15.slice(i-199,i+1),k15[i].c,{lite:true,hold,mode});
     sig.push({i,dir:j.dir,score:j.score,plan:j.plan})}
   return sig;
 }
@@ -624,9 +666,9 @@ async function loadBtData(days,prog){
   if(k15.length<300||k1.length<760||k4.length<220)throw new Error('K 线不够');
   return S.btData={sym,days,live:S.live,at:Date.now(),k15,k1,k4};
 }
-async function sigChunked(D,hold,out,label,days){
+async function sigChunked(D,hold,out,label,days,mode){
   const {k15,k1,k4}=D,from=Math.max(200,k15.findIndex(x=>x.t>=k1[750].t),k15.length-days*96),sig=[];
-  for(let s0=from;s0<k15.length;s0+=400){sig.push(...genSig(k15,k1,k4,hold,s0,Math.min(k15.length,s0+400)));out.innerHTML=`<div class="empty">${label} ${Math.round((s0-from)/(k15.length-from)*100)}%</div>`;await new Promise(r=>setTimeout(r,0))}
+  for(let s0=from;s0<k15.length;s0+=400){sig.push(...genSig(k15,k1,k4,hold,s0,Math.min(k15.length,s0+400),mode));out.innerHTML=`<div class="empty">${label} ${Math.round((s0-from)/(k15.length-from)*100)}%</div>`;await new Promise(r=>setTimeout(r,0))}
   return sig;
 }
 async function runBacktest(days){
@@ -643,12 +685,13 @@ async function runOptimize(){
   const btn=$('#bOpt'),out=$('#optOut');btn.disabled=true;$('#bBt').disabled=true;let steps=0;const prog=()=>{out.innerHTML=`<div class="empty">正在下载 90 天 K 线…（${++steps}）</div>`};
   try{
     const D=await loadBtData(90,prog),k15=D.k15,split=k15[k15.length-1].t-30*864e5,rows=[];
-    for(const hold of [4,8,12]){
-      const sig=await sigChunked(D,hold,out,`正在测试持仓窗口 ${hold} 小时…`,90);
+    const runs=[['trend',4],['trend',8],['trend',12],['revert',4],['auto',8],['auto',12]];let k=0;
+    for(const [mode,hold] of runs){k++;
+      const sig=await sigChunked(D,hold,out,`第 ${k}/6 轮：${MODES[mode]}${mode==='revert'?'':' · 窗口 '+hold+' 小时'}…`,90,mode);
       const tr=sig.filter(x=>k15[x.i].t<split),te=sig.filter(x=>k15[x.i].t>=split);
-      for(const minScore of [60,70,80])for(const f of [{cool:0,rrMin:0,name:'无过滤'},{cool:4,rrMin:1,name:'冷却+盈亏比≥1'}]){
+      for(const minScore of (mode==='revert'?[50,60,70]:[60,70,80]))for(const f of [{cool:0,rrMin:0,name:'无过滤'},{cool:4,rrMin:1,name:'冷却+盈亏比≥1'}]){
         const o={minScore,cool:f.cool,rrMin:f.rrMin};
-        rows.push({hold,minScore,...f,tr:btStats(btSimulate(tr,k15,cfg.scale,o)),te:btStats(btSimulate(te,k15,cfg.scale,o))});
+        rows.push({mode,hold,minScore,...f,tr:btStats(btSimulate(tr,k15,cfg.scale,o)),te:btStats(btSimulate(te,k15,cfg.scale,o))});
       }
     }
     S.opt={rows,demo:!S.live};renderOptimize();
@@ -658,17 +701,17 @@ async function runOptimize(){
 function renderOptimize(){
   const r=S.opt,out=$('#optOut');if(!r)return;
   const rows=[...r.rows].sort((a,b)=>b.tr.total-a.tr.total),best=rows.find(x=>x.tr.n>=20)||rows[0];
-  const isCur=x=>x.hold===cfg.hold&&x.minScore===cfg.minScore&&x.cool===cfg.cool&&x.rrMin===cfg.rrMin;
+  const isCur=x=>x.mode===(cfg.mode||'trend')&&(x.mode==='revert'||x.hold===cfg.hold)&&x.minScore===cfg.minScore&&x.cool===cfg.cool&&x.rrMin===cfg.rrMin;
   const cell=s=>`<span class="${s.n?pc(s.total):'muted'}">${s.n?s.wr.toFixed(0)+'% · '+sg(s.total):'没开单'}</span><br><span class="muted">${s.n} 笔</span>`;
-  let v;if(best.tr.total<=0)v='18 组参数在前 60 天全都亏钱。光调参数救不了，问题在判断书的规则本身，下一步要改逻辑。';
+  let v;if(best.tr.total<=0)v=`三种策略、${rows.length} 组参数在前 60 天全都亏钱。靠这些技术指标规则在这段行情里赚不到钱，需要换思路。`;
   else if(best.te.total>0)v=`前 60 天最好的一组，到后 30 天也还在赚（${sg(best.te.total)}）。可以采用，继续纸面跑验证。`;
   else v=`前 60 天最好的一组，到后 30 天就亏了（${sg(best.te.total)}）。说明它只是碰巧适合过去那段行情，不能信，下一步要改判断书的逻辑。`;
   out.innerHTML=`${r.demo?'<div class="demobar">演示数据跑的结果，没有参考意义。</div>':''}<div class="verdictline">${v}</div>
-  <div style="overflow-x:auto"><table class="opt"><thead><tr><th>开仓线</th><th>窗口</th><th>过滤</th><th>前 60 天（找参数）</th><th>后 30 天（检验）</th></tr></thead><tbody>
-  ${rows.slice(0,8).concat(rows.slice(8).filter(isCur)).map(x=>`<tr class="${x===best?'best':''} ${isCur(x)?'cur':''}"><td>${x.minScore}</td><td>${x.hold}h</td><td>${x.name}</td><td>${cell(x.tr)}</td><td>${cell(x.te)}</td></tr>`).join('')}</tbody></table></div>
+  <div style="overflow-x:auto"><table class="opt"><thead><tr><th>策略</th><th>开仓线</th><th>窗口</th><th>过滤</th><th>前 60 天（找参数）</th><th>后 30 天（检验）</th></tr></thead><tbody>
+  ${rows.slice(0,10).concat(rows.slice(10).filter(isCur)).map(x=>`<tr class="${x===best?'best':''} ${isCur(x)?'cur':''}"><td>${MODES[x.mode]}</td><td>${x.minScore}</td><td>${x.mode==='revert'?'—':x.hold+'h'}</td><td>${x.name}</td><td>${cell(x.tr)}</td><td>${cell(x.te)}</td></tr>`).join('')}</tbody></table></div>
   <div class="note">紫框是前 60 天最好的一组，虚线是你现在用的设置。只在前 60 天里挑参数，再看它在没参与挑选的后 30 天表现如何，这样才能判断它是真的好还是碰巧。</div>
-  ${best.tr.total>0&&best.te.total>0&&!isCur(best)?`<div class="btnrow"><button class="btn primary" id="bApply">采用这组：开仓线 ${best.minScore} · 窗口 ${best.hold}h · ${best.name}</button></div>`:''}`;
-  const ap=document.getElementById('bApply');if(ap)ap.onclick=()=>{Object.assign(cfg,{minScore:best.minScore,hold:best.hold,cool:best.cool,rrMin:best.rrMin});saveCfg();
+  ${best.tr.total>0&&best.te.total>0&&!isCur(best)?`<div class="btnrow"><button class="btn primary" id="bApply">采用这组：${MODES[best.mode]} · 开仓线 ${best.minScore}${best.mode==='revert'?'':' · 窗口 '+best.hold+'h'} · ${best.name}</button></div>`:''}`;
+  const ap=document.getElementById('bApply');if(ap)ap.onclick=()=>{Object.assign(cfg,{mode:best.mode,minScore:best.minScore,hold:best.hold,cool:best.cool,rrMin:best.rrMin});saveCfg();$('#cMode').value=cfg.mode;
     [['cMin','minScore'],['cHold','hold'],['cCool','cool'],['cRr','rrMin']].forEach(([id,k])=>$('#'+id).value=cfg[k]);runJudge();renderJudge();setPriceLines();renderOptimize();toast('已采用新参数')};
 }
 const floatPnl=pos=>(pos.side==='LONG'?S.price-pos.entry:pos.entry-S.price)*pos.qty;
@@ -784,8 +827,8 @@ function renderJudge(){
   $('#ring').innerHTML=`<circle cx="36" cy="36" r="30" fill="none" stroke="${css('--line')}" stroke-width="7"/><circle cx="36" cy="36" r="30" fill="none" stroke="${col}" stroke-width="7" stroke-linecap="round" stroke-dasharray="${C*j.score/100} ${C}" transform="rotate(-90 36 36)"/><text x="36" y="41" text-anchor="middle" font-family="Manrope,sans-serif" font-weight="800" font-size="17" fill="${css('--ink')}">${j.score}</text>`;
   const v=$('#jVerdict');v.textContent=j.dir==='WAIT'?'观望':!j.go?(j.dir==='LONG'?'观望（偏多）':'观望（偏空）'):j.dir==='LONG'?'做多':'做空';v.style.color=j.go?col:css('--ink-2');
   $('#jSummary').textContent=j.summary;$('#jTime').textContent=hhmm(j.at)+' 更新';
-  const chip=(k,d)=>`<div class="tfchip"><span class="k">${k}</span><span class="v ${d==='LONG'?'up':d==='SHORT'?'down':'muted'}">${dirTxt[d]}</span></div>`;
-  $('#tfChips').innerHTML=chip('4h 大方向',j.big)+chip('1h 小时级',j.hour)+chip('15m 入场',j.trig);
+  $('#tfChips').innerHTML=(j.chips||[]).map(c=>`<div class="tfchip"><span class="k">${c.k}</span><span class="v ${c.c}">${c.v}</span></div>`).join('');
+  $('#jTime').textContent=MODES[cfg.mode||'trend']+' · '+hhmm(j.at)+' 更新';
   const ic={ok:'✓',warn:'!',bad:'✕'};$('#reasons').innerHTML=j.items.map(i=>`<li><span class="ic ${i.s}">${ic[i.s]}</span><span>${i.t}</span></li>`).join('');
   $('#holdLbl').textContent=`持有 ${j.H} 小时`;
   const L=j.L,rows=[['P20上',L.p20u,'--p20'],['P50上',L.p50u,'--p50'],['现价',S.price,'--accent'],['P50下',L.p50d,'--p50'],['P20下',L.p20d,'--p20']];
@@ -874,6 +917,7 @@ $('#bRetry').onclick=()=>connect();
 let btDays=30;$('#btRange').onclick=e=>{const b=e.target.closest('button');if(!b)return;btDays=+b.dataset.d;document.querySelectorAll('#btRange button').forEach(x=>x.classList.toggle('on',x===b))};
 $('#bBt').onclick=()=>runBacktest(btDays);
 $('#bOpt').onclick=()=>runOptimize();
+$('#cMode').value=cfg.mode||'trend';$('#cMode').onchange=e=>{cfg.mode=e.target.value;saveCfg();runJudge();renderJudge();setPriceLines();renderOptimize();toast('已切换到'+MODES[cfg.mode])};
 let resetArm=0;$('#bReset').onclick=e=>{if(Date.now()-resetArm>4000){resetArm=Date.now();e.target.textContent='再点一次确认重置（清空纸面记录）';setTimeout(()=>e.target.textContent='重置纸面账户',4000);return}
   acct={balance:cfg.start,pos:{},hist:[]};saveAcct();sset(acctKey()+'_seeded',true);e.target.textContent='重置纸面账户';renderAll();toast('纸面账户已重置')};
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(CH){CH.main.applyOptions(chartTheme());CH.sub.applyOptions({...chartTheme(),layout:{...chartTheme().layout,attributionLogo:false},timeScale:{visible:false,borderVisible:false}});setChartData()}renderAll();renderSenti()});
