@@ -351,7 +351,7 @@ a{color:var(--accent)}
       </ol>
     </div>
     <div class="card">
-      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-04 · 第 11 版</span></h2>
+      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-04 · 第 12 版</span></h2>
       <div class="btnrow" style="margin-top:10px"><button class="btn danger" id="bReset" style="grid-column:1/-1">重置纸面账户</button></div>
     </div>
   </section>
@@ -425,7 +425,7 @@ function genK(sym,tf,n=500){
 }
 async function klines(sym,tf,limit=500){
   const key=sym+tf;
-  if(S.live){const r=await getJSON(`${API}${PFX}/klines?symbol=${sym}&interval=${tf}&limit=${limit}`);S.kl[key]=r.map(mapK)}
+  if(S.live){let r;for(let a=0;a<3;a++){try{r=await getJSON(`${API}${PFX}/klines?symbol=${sym}&interval=${tf}&limit=${limit}`,15000);break}catch(e){if(a===2)throw e;await new Promise(z=>setTimeout(z,1500))}};S.kl[key]=r.map(mapK)}
   else if(!S.kl[key])S.kl[key]=genK(sym,tf,limit);
   return S.kl[key];
 }
@@ -438,7 +438,7 @@ function applyTick(sym,p,addV=0){
 async function connect(){
   if(S.connecting)return;S.connecting=true;clearTimeout(S.retryT);
   setStatus('connecting');
-  let res;for(let a=0;a<3;a++){res=await Promise.allSettled(ROUTES.map(r=>getJSON(r[1]+r[2]+'/ping',8000)));if(res.some(x=>x.status==='fulfilled'))break;$('#statusTxt').textContent=`连接中…（第 ${a+2} 次）`}
+  S.klFail=false;let res;for(let a=0;a<3;a++){res=await Promise.allSettled(ROUTES.map(r=>getJSON(r[1]+r[2]+'/ping',8000)));if(res.some(x=>x.status==='fulfilled'))break;$('#statusTxt').textContent=`连接中…（第 ${a+2} 次）`}
   S.diag=ROUTES.map((r,i)=>[r[1].replace('https://',''),res[i].status==='fulfilled']);
   const i=res.findIndex(x=>x.status==='fulfilled');
   if(i>=0){S.live=true;S.src=ROUTES[i][0];API=ROUTES[i][1];PFX=ROUTES[i][2];WSS=ROUTES[i][3]}else{S.live=false;S.src='demo'}
@@ -453,7 +453,7 @@ async function loadSymbol(){
     const k=S.kl[cfg.sym+cfg.tf];S.price=k[k.length-1].c;
     if(S.live){try{const t=await getJSON(`${API}${PFX}/ticker/24hr?symbol=${cfg.sym}`);S.chg=+t.priceChangePercent}catch(e){}}
     else{const d=S.kl[cfg.sym+'1h'];const p0=d[d.length-25].c;S.chg=(S.price/p0-1)*100}
-  }catch(e){if(S.live){S.live=false;S.src='demo';setStatus('demo');loadAcct();clearTimeout(S.retryT);S.retryT=setTimeout(()=>{S.connecting=false;connect()},20000);return loadSymbol()}}
+  }catch(e){if(S.live){S.live=false;S.src='demo';S.klFail=true;setStatus('demo');loadAcct();clearTimeout(S.retryT);S.retryT=setTimeout(()=>{S.connecting=false;connect()},20000);return loadSymbol()}}
   runJudge();setChartData();renderAll();openStream();loadSenti();
 }
 function setStatus(s){const d=$('#dot');d.className='dot '+(s==='live'?'live':s==='demo'?'demo':'');$('#demoBar').hidden=s!=='demo';
@@ -461,7 +461,7 @@ function setStatus(s){const d=$('#dot');d.className='dot '+(s==='live'?'live':s=
   const dg=S.diag.length?'<br><br>线路检测：'+S.diag.map(([h,ok])=>`<span class="${ok?'up':'down'}">${ok?'✓':'✕'}</span> ${h}`).join('　'):'';
   $('#srcNote').innerHTML=(s==='live'&&S.src==='fapi'?'行情来自币安 USDⓈ-M 永续公开接口（K 线、24h 行情、资金费率、持仓量、多空比），通过 WebSocket 实时推送。图表引擎是 TradingView 开源的 Lightweight Charts。':
   s==='live'?'你的网络连不上币安合约接口，现在用的是<b>币安现货线路</b>：价格和 K 线是真实的现货行情，和永续合约通常只差零点几美元，判断书照常计算。资金费率、持仓量、多空比只有合约接口才有，暂时显示不了；开 VPN 后点「重新连接」可切回合约线路。':
-  '币安的合约和现货线路都没连上，显示的是<b>演示数据</b>，纸面账户也和实时账户分开记录。开启能访问币安的网络（VPN）后点「重新连接币安行情」。')+dg}
+  (S.klFail&&S.diag.some(x=>x[1])?'线路能连通，但下载 K 线时超时了（网络慢或不稳），暂时显示<b>演示数据</b>。App 每 20 秒会自动重连。':'币安的合约和现货线路都没连上，显示的是<b>演示数据</b>')+'，纸面账户也和实时账户分开记录。开启能访问币安的网络（VPN）后点「重新连接币安行情」。')+dg}
 
 function openStream(){
   if(S.ws){try{S.ws.close()}catch(e){}S.ws=null}
