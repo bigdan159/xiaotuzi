@@ -221,6 +221,7 @@ a{color:var(--accent)}
     </div>
     <div class="subtitle" id="viewTitle">总览</div>
     <div class="pricerow"><span class="bigprice num" id="price">—</span><span class="chg num" id="chg">—</span></div>
+    <button class="installtip" id="updTip" hidden style="border:0;width:100%;text-align:left;font:inherit;cursor:pointer"><span id="updTxt">有新版本，点这里更新</span></button>
     <div class="installtip" id="installTip" hidden><span>在 Safari 里点「分享」→「添加到主屏幕」，从图标打开就没有地址栏，滑动和点按都更像 App。</span><button id="tipX" aria-label="关闭">×</button></div>
     <div class="demobar" id="demoBar" hidden>演示数据：价格是随机生成的，不是真实行情，这时自动跟单会暂停。App 每 20 秒自动重连一次，连上后会自己切回实时。原因是币安的合约和现货线路都没连上；打开能访问币安的网络（VPN）后，到「配置」点「重新连接币安行情」。</div>
   </header>
@@ -366,7 +367,7 @@ a{color:var(--accent)}
       </ol>
     </div>
     <div class="card">
-      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-04 · 第 15 版</span></h2>
+      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-04 · 第 16 版</span></h2>
       <div class="btnrow" style="margin-top:10px"><button class="btn danger" id="bReset" style="grid-column:1/-1">重置纸面账户</button></div>
     </div>
   </section>
@@ -1099,6 +1100,12 @@ document.addEventListener('touchend',e=>{if(!sOk)return;const t=e.changedTouches
 try{const ios=/iPhone|iPad|iPod/.test(navigator.userAgent),standalone=navigator.standalone||matchMedia('(display-mode: standalone)').matches;
   if(ios&&!standalone&&!sget('tipClosed',false)&&location.hostname.endsWith('github.io'))$('#installTip').hidden=false}catch(e){}
 $('#tipX').onclick=()=>{$('#installTip').hidden=true;sset('tipClosed',true)};
+
+/* ---------- update check ---------- */
+const MYVER=16;
+async function checkUpdate(){try{const r=await fetch('index.html?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const m=(await r.text()).match(/第 (\d+) 版/);
+  if(m&&+m[1]>MYVER){$('#updTxt').textContent=`有新版本（第 ${m[1]} 版），点这里更新`;$('#updTip').hidden=false;$('#updTip').onclick=()=>location.replace(location.pathname+'?v='+m[1])}}catch(e){}}
+if(location.protocol.startsWith('http')){setTimeout(checkUpdate,8000);setInterval(checkUpdate,5*60e3);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()})}
 
 /* ---------- loops ---------- */
 setInterval(async()=>{try{if(S.live)await Promise.all([klines(cfg.sym,'4h',300),klines(cfg.sym,'1h',800),klines(cfg.sym,'15m',300)]);runJudge();autoTrade();renderJudge();setPriceLines()}catch(e){}},60000);
