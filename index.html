@@ -122,7 +122,7 @@ button{cursor:pointer}
 .fill .l2{font-size:13px;color:var(--ink-2);font-family:var(--f-num);font-variant-numeric:tabular-nums;display:flex;flex-wrap:wrap;gap:2px 6px;align-items:baseline}
 .fill .l2 .v{color:var(--ink);font-size:15px}
 .fill .l3{font-size:12px;color:var(--ink-2);line-height:1.5}
-.kind-open{color:var(--p50)} .kind-close{color:var(--pink)} .kind-reduce{color:var(--warn)}
+.kind-open{color:var(--p50)} .kind-close{color:var(--pink)} .kind-reduce{color:var(--warn)} .kind-add{color:var(--p20)}
 .seg{display:flex;gap:6px}
 .seg button{flex:1;border:0;background:var(--surface-2);color:var(--ink-2);border-radius:12px;padding:9px 0;font-weight:700;font-size:13px}
 .seg button.on{background:var(--accent-soft);color:var(--accent)}
@@ -212,7 +212,7 @@ a{color:var(--accent)}
     <div class="subtitle" id="viewTitle">总览</div>
     <div class="pricerow"><span class="bigprice num" id="price">—</span><span class="chg num" id="chg">—</span></div>
     <div class="installtip" id="installTip" hidden><span>在 Safari 里点「分享」→「添加到主屏幕」，从图标打开就没有地址栏，滑动和点按都更像 App。</span><button id="tipX" aria-label="关闭">×</button></div>
-    <div class="demobar" id="demoBar" hidden>演示数据：价格是随机生成的，不是真实行情。原因是币安的合约和现货线路都没连上；打开能访问币安的网络（VPN）后，到「配置」点「重新连接币安行情」。</div>
+    <div class="demobar" id="demoBar" hidden>演示数据：价格是随机生成的，不是真实行情，这时自动跟单会暂停。App 每 20 秒自动重连一次，连上后会自己切回实时。原因是币安的合约和现货线路都没连上；打开能访问币安的网络（VPN）后，到「配置」点「重新连接币安行情」。</div>
   </header>
 
   <!-- 总览 -->
@@ -279,7 +279,7 @@ a{color:var(--accent)}
     </div>
     <div class="card">
       <h2 class="h2">自动找更好的参数</h2>
-      <div class="note" style="margin-top:6px">把四种策略（趋势跟随、区间回归、4 小时趋势、自动切换）和不同的开仓线、持仓窗口、过滤条件组合起来，一共 36 组，各回测一遍。用前 60 天挑参数，后 30 天检验，防止挑到只是碰巧好看的参数。大约要 1 分钟。可以分别在 ETH 和 BTC 上跑，两个都赚的规则才更可信。</div>
+      <div class="note" style="margin-top:6px">把五种策略（趋势跟随、区间回归、4 小时趋势、大方向加仓、自动切换）和不同的开仓线、持仓窗口、过滤条件组合起来，一共 36 组，各回测一遍。用前 60 天挑参数，后 30 天检验，防止挑到只是碰巧好看的参数。大约要 1 分钟。可以分别在 ETH 和 BTC 上跑，两个都赚的规则才更可信。</div>
       <div class="seg" id="optSym" style="margin-top:12px"><button data-s="ETHUSDT">ETH</button><button data-s="BTCUSDT">BTC</button><button data-s="SOLUSDT">SOL</button></div>
       <div class="btnrow" style="margin-top:12px"><button class="btn primary" id="bOpt">开始寻找</button></div>
       <div id="optOut" style="margin-top:12px;display:flex;flex-direction:column;gap:12px"></div>
@@ -324,7 +324,7 @@ a{color:var(--accent)}
     </div>
     <div class="card">
       <h2 class="h2">判断书与风控</h2>
-      <div class="field"><label for="cMode">策略模式<small>趋势跟随：15 分钟级顺势；区间回归：冲出布林带后博回到中轨；4 小时趋势：顺 4 小时大方向、等 1 小时回踩再进；自动切换：按 1h 和 4h 的 ADX 判断行情选一种</small></label><select id="cMode" style="border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--surface-2)"><option value="trend">趋势跟随</option><option value="revert">区间回归</option><option value="trend4h">4小时趋势</option><option value="auto">自动切换</option></select></div>
+      <div class="field"><label for="cMode">策略模式<small>趋势跟随：15 分钟级顺势；区间回归：冲出布林带后博回到中轨；4 小时趋势：顺 4 小时大方向、等 1 小时回踩再进；大方向加仓：同样顺大方向，但分 3 批建仓、统一止损、最多拿 3 天；自动切换：按 1h 和 4h 的 ADX 判断行情选一种</small></label><select id="cMode" style="border:1px solid var(--line);border-radius:10px;padding:7px 10px;background:var(--surface-2)"><option value="trend">趋势跟随</option><option value="revert">区间回归</option><option value="trend4h">4小时趋势</option><option value="swing">大方向加仓</option><option value="auto">自动切换</option></select></div>
       <div class="field"><label for="cMin">最低开仓评分<small>判断书评分达到才开仓</small></label><input type="number" id="cMin" min="0" max="100" step="5"></div>
       <div class="field"><label for="cHold">持仓窗口（小时）<small>决定 P50 / P20 区间宽度</small></label><input type="number" id="cHold" min="1" max="48" step="1"></div>
       <div class="field"><label for="cAuto">自动跟判断书开平仓<small>每分钟检查一次，只在纸面执行</small></label><input type="checkbox" class="switch" id="cAuto"></div>
@@ -351,7 +351,7 @@ a{color:var(--accent)}
       </ol>
     </div>
     <div class="card">
-      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-04 · 第 10 版</span></h2>
+      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-04 · 第 11 版</span></h2>
       <div class="btnrow" style="margin-top:10px"><button class="btn danger" id="bReset" style="grid-column:1/-1">重置纸面账户</button></div>
     </div>
   </section>
@@ -436,21 +436,24 @@ function applyTick(sym,p,addV=0){
 }
 
 async function connect(){
+  if(S.connecting)return;S.connecting=true;clearTimeout(S.retryT);
   setStatus('connecting');
-  const res=await Promise.allSettled(ROUTES.map(r=>getJSON(r[1]+r[2]+'/ping',5000)));
+  let res;for(let a=0;a<3;a++){res=await Promise.allSettled(ROUTES.map(r=>getJSON(r[1]+r[2]+'/ping',8000)));if(res.some(x=>x.status==='fulfilled'))break;$('#statusTxt').textContent=`连接中…（第 ${a+2} 次）`}
   S.diag=ROUTES.map((r,i)=>[r[1].replace('https://',''),res[i].status==='fulfilled']);
   const i=res.findIndex(x=>x.status==='fulfilled');
   if(i>=0){S.live=true;S.src=ROUTES[i][0];API=ROUTES[i][1];PFX=ROUTES[i][2];WSS=ROUTES[i][3]}else{S.live=false;S.src='demo'}
   S.kl={};loadAcct();setStatus(S.live?'live':'demo');
-  await loadSymbol();
+  try{await loadSymbol()}finally{S.connecting=false}
+  if(!S.live)S.retryT=setTimeout(()=>connect(),20000);
 }
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!S.live)connect()});
 async function loadSymbol(){
   try{
     await Promise.all([klines(cfg.sym,cfg.tf),klines(cfg.sym,'4h',300),klines(cfg.sym,'1h',800),klines(cfg.sym,'15m',300)]);
     const k=S.kl[cfg.sym+cfg.tf];S.price=k[k.length-1].c;
     if(S.live){try{const t=await getJSON(`${API}${PFX}/ticker/24hr?symbol=${cfg.sym}`);S.chg=+t.priceChangePercent}catch(e){}}
     else{const d=S.kl[cfg.sym+'1h'];const p0=d[d.length-25].c;S.chg=(S.price/p0-1)*100}
-  }catch(e){if(S.live){S.live=false;S.src='demo';setStatus('demo');loadAcct();return loadSymbol()}}
+  }catch(e){if(S.live){S.live=false;S.src='demo';setStatus('demo');loadAcct();clearTimeout(S.retryT);S.retryT=setTimeout(()=>{S.connecting=false;connect()},20000);return loadSymbol()}}
   runJudge();setChartData();renderAll();openStream();loadSenti();
 }
 function setStatus(s){const d=$('#dot');d.className='dot '+(s==='live'?'live':s==='demo'?'demo':'');$('#demoBar').hidden=s!=='demo';
@@ -572,13 +575,21 @@ function judgeTrend4h(k4,k1,k15,p,o={}){
   const cc=d=>d==='LONG'?'up':d==='SHORT'?'down':'muted';
   return{dir,go,score,items,L,plan,summary,H,chips:[{k:'4h 方向',v:dirTxt[R4.dir4],c:cc(R4.dir4)},{k:'4h ADX',v:R4.A4.toFixed(0),c:R4.A4>=25?'up':'muted'},{k:'1h 回踩',v:pull?'到位':'未到',c:pull?'up':'muted'}]};
 }
-const MODES={trend:'趋势跟随',revert:'区间回归',trend4h:'4小时趋势',auto:'自动切换'};
-const NOHOLD=m=>m==='revert'||m==='trend4h';
+function judgeSwing(k4,k1,k15,p,o={}){
+  const j=judgeTrend4h(k4,k1,k15,p,o);if(j.dir==='WAIT')return j;
+  const a4=atr(k4),sh=j.dir==='SHORT',d=sh?1:-1;
+  j.plan={entry:p,sl:p+d*1.8*a4,tp:p-d*2.5*a4,tp2:p-d*2.5*a4,rr:2.5/1.8,adds:[p+d*.6*a4,p+d*1.2*a4],tpd:2.5*a4,maxH:72};
+  if(j.items)j.items.push({s:'ok',t:`分 3 批建仓：先开 1/3，${sh?'反弹':'回落'}到 ${fp(j.plan.adds[0])}、${fp(j.plan.adds[1])} 再各加 1/3；统一止损 ${fp(j.plan.sl)}，最多拿 3 天`});
+  return j;
+}
+const MODES={trend:'趋势跟随',revert:'区间回归',trend4h:'4小时趋势',swing:'大方向加仓',auto:'自动切换'};
+const NOHOLD=m=>m==='revert'||m==='trend4h'||m==='swing';
 function judgeCore(k4,k1,k15,p,o={}){
   const mode=o.mode||cfg.mode||'trend';
   if(mode==='trend')return judgeTrend(k4,k1,k15,p,o);
   if(mode==='revert')return judgeRevert(k4,k1,k15,p,o);
   if(mode==='trend4h')return judgeTrend4h(k4,k1,k15,p,o);
+  if(mode==='swing')return judgeSwing(k4,k1,k15,p,o);
   const A=adx(k1),R4=regime4(k4),pre=(j,t)=>{if(j.items)j.items.unshift({s:'ok',t});return j};
   if(R4.strong)return pre(judgeTrend4h(k4,k1,k15,p,{...o,r4:R4}),`4h ADX ${R4.A4.toFixed(0)}，单边${dirTxt[R4.dir4]}：用 4 小时趋势跟随`);
   if(A>=25)return pre(judgeTrend(k4,k1,k15,p,o),`1h ADX ${A.toFixed(0)} ≥ 25：小时级趋势，用趋势跟随`);
@@ -626,7 +637,7 @@ function renderLog(){
    ${ch.slice(-8).reverse().map(c=>`<div class="btrow" style="grid-template-columns:auto 1fr"><span class="num muted">${hhmm(c.t)}</span><span>${c.k}<br><span class="muted" style="font-size:12px">${c.r}</span></span></div>`).join('')}`;
 }
 function autoTrade(){
-  if(!cfg.auto||!S.judge)return;const j=S.judge,pos=acct.pos[cfg.sym];
+  if(!cfg.auto||!S.judge||!S.live)return;const j=S.judge,pos=acct.pos[cfg.sym];
   const ok=j.go&&passFilter(j.dir,j.plan,Date.now(),(acct.lastStop||{})[cfg.sym],cfg);logCheck(j,ok);
   if(pos&&ok&&j.dir!==pos.side){closePos(cfg.sym,'判断书反向信号');}
   if(!acct.pos[cfg.sym]&&ok&&Date.now()-S.lastAuto>15*60e3){S.lastAuto=Date.now();openPos(j.dir,'判断书趋势 '+j.dir+'：'+j.items.filter(x=>x.s!=='bad').map(x=>x.t).join('；'),j.plan)}
@@ -635,12 +646,12 @@ function autoTrade(){
 /* ---------- paper engine ---------- */
 function openPos(side,note,plan){
   if(acct.pos[cfg.sym]){toast('已有持仓，先平仓');return}
-  const p=S.price,qty=+(cfg.notional/p).toFixed(4),notional=qty*p,fee=notional*feeRate();
+  const p=S.price,sw=!!(plan&&plan.adds&&cfg.tpsl),qty=+(cfg.notional/(sw?3:1)/p).toFixed(4),notional=qty*p,fee=notional*feeRate();
   let sl=null,tp=null,tp2=null;
   if(cfg.tpsl){let P=plan;if(!(P&&((side==='SHORT'&&P.sl>p)||(side==='LONG'&&P.sl<p)))){const L=S.judge?.L||{p50u:p*1.01,p50d:p*.99,p20u:p*1.02,p20d:p*.98};P=mkPlan(side,p,L,atr(S.kl[cfg.sym+'1h']))}
     sl=P.sl;tp=P.tp;tp2=P.tp2}
   const now=Date.now();
-  const pos={id:now,sym:cfg.sym,side,qty,qty0:qty,entry:p,sl,tp,tp2,scale:!!cfg.scale,tp1done:false,open:now,trailed:false,fills:[{kind:'open',act:side==='LONG'?'买':'卖',qty,price:p,notional,fee,pnl:-fee,time:now,note}]};
+  const pos={id:now,sym:cfg.sym,side,qty,qty0:qty,entry:p,sl,tp,tp2,sw,adds:sw?[...plan.adds]:null,tpd:sw?plan.tpd:null,maxH:sw?plan.maxH:null,n0:cfg.notional/3,scale:!!cfg.scale&&!sw,tp1done:false,open:now,trailed:false,fills:[{kind:'open',act:side==='LONG'?'买':'卖',qty,price:p,notional,fee,pnl:-fee,time:now,note}]};
   acct.pos[cfg.sym]=pos;acct.balance-=fee;saveAcct();renderAll();toast(`纸面开${side==='LONG'?'多':'空'} ${qty} ${base(cfg.sym)} @ ${fp(p)}`);
 }
 function reducePos(sym,frac,note){
@@ -648,6 +659,12 @@ function reducePos(sym,frac,note){
   const notional=q*p,fee=notional*feeRate(),gross=(pos.side==='LONG'?p-pos.entry:pos.entry-p)*q;
   pos.fills.push({kind:'reduce',act:pos.side==='LONG'?'卖':'买',qty:q,price:p,notional,fee,pnl:gross-fee,time:Date.now(),note});
   pos.qty=+(pos.qty-q).toFixed(4);acct.balance+=gross-fee;saveAcct();renderAll();toast(`${note}：${sg(gross-fee)} USDT`);
+}
+function addPos(pos){
+  const p=S.price,q=+(pos.n0/p).toFixed(4),notional=q*p,fee=notional*feeRate(),sh=pos.side==='SHORT';
+  pos.entry=(pos.entry*pos.qty+p*q)/(pos.qty+q);pos.qty=+(pos.qty+q).toFixed(4);pos.tp=pos.tp2=sh?pos.entry-pos.tpd:pos.entry+pos.tpd;
+  pos.fills.push({kind:'add',act:sh?'卖':'买',qty:q,price:p,notional,fee,pnl:-fee,time:Date.now(),note:`第 ${pos.fills.filter(f=>f.kind!=='close'&&f.kind!=='reduce').length+1} 批加仓：均价变为 ${fp(pos.entry)}，止盈跟着挪到 ${fp(pos.tp)}`});
+  acct.balance-=fee;saveAcct();renderAll();toast(`纸面加仓 ${q} ${base(pos.sym)} @ ${fp(p)}`);
 }
 function closePos(sym,note){
   const pos=acct.pos[sym];if(!pos)return;const p=S.price,notional=pos.qty*p,fee=notional*feeRate();
@@ -660,6 +677,8 @@ function closePos(sym,note){
 }
 function checkStops(){
   const pos=acct&&acct.pos[cfg.sym];if(!pos||pos.sl==null)return;const p=S.price,sh=pos.side==='SHORT';
+  if(pos.sw){while(pos.adds&&pos.adds.length&&(sh?p>=pos.adds[0]:p<=pos.adds[0])&&(sh?pos.adds[0]<pos.sl:pos.adds[0]>pos.sl)){pos.adds.shift();addPos(pos)}
+    if(Date.now()-pos.open>pos.maxH*36e5)return closePos(cfg.sym,'超时离场（拿满 3 天）')}
   const hitSL=sh?p>=pos.sl:p<=pos.sl,hit=t=>t!=null&&(sh?p<=t:p>=t);
   if(hitSL)return closePos(cfg.sym,pos.tp1done?'第二批保本离场':pos.trailed?'移动止损':'自动止损');
   if(pos.scale){
@@ -685,8 +704,10 @@ function btSimulate(sig,k15,scale,o={}){
   const fin=(i,price,note)=>{const g=(pos.side==='LONG'?price-pos.entry:pos.entry-price)*pos.q,f=pos.q*price*fee;pos.pnl+=g-f;pos.fee+=f;pos.exit=price;pos.closeT=k15[i].t+9e5;pos.note=note;if(note==='止损')last[pos.side]=pos.closeT;trades.push(pos);pos=null};
   for(const s of sig){const i=s.i,b=k15[i],T=b.t+9e5;
     if(pos&&i>pos.i){const sh=pos.side==='SHORT',adv=sh?b.h:b.l,fav=sh?b.l:b.h,reach=t=>sh?fav<=t:fav>=t;
-      if(sh?adv>=pos.sl:adv<=pos.sl)fin(i,pos.sl,pos.tp1done?'保本':pos.tr?'移动止损':'止损');
-      else if(scale){
+      if(pos.sw){while(pos.adds.length&&(sh?adv>=pos.adds[0]:adv<=pos.adds[0])&&(sh?pos.adds[0]<pos.sl:pos.adds[0]>pos.sl)){const ap=pos.adds.shift(),aq=pos.n0/ap,f=pos.n0*fee;pos.entry=(pos.entry*pos.q+ap*aq)/(pos.q+aq);pos.q+=aq;pos.pnl-=f;pos.fee+=f;pos.tp=sh?pos.entry-pos.tpd:pos.entry+pos.tpd;pos.nAdd++}}
+      if(pos.sw&&T-pos.openT>pos.maxH*36e5)fin(i,b.c,'超时离场');
+      else if(sh?adv>=pos.sl:adv<=pos.sl)fin(i,pos.sl,pos.tp1done?'保本':pos.tr?'移动止损':'止损');
+      else if(scale&&!pos.sw){
         if(!pos.tp1done&&reach(pos.tp)){const q=pos.q/2,g=(sh?pos.entry-pos.tp:pos.tp-pos.entry)*q,f=q*pos.tp*fee;pos.pnl+=g-f;pos.fee+=f;pos.q-=q;pos.tp1done=true;pos.sl=pos.entry}
         if(pos.tp1done&&reach(pos.tp2))fin(i,pos.tp2,'第二批止盈');
       }else{
@@ -695,7 +716,7 @@ function btSimulate(sig,k15,scale,o={}){
       }}
     const go=s.dir!=='WAIT'&&s.score>=ms&&passFilter(s.dir,s.plan,T,last,o);
     if(pos&&go&&s.dir!==pos.side)fin(i,b.c,'反向信号');
-    if(!pos&&go&&i-lastOpen>=1&&s.plan){const p=b.c,q=N/p;pos={i,side:s.dir,entry:p,q,openT:T,sl:s.plan.sl,tp:s.plan.tp,tp2:s.plan.tp2,pnl:-N*fee,fee:N*fee,tp1done:false,tr:false};lastOpen=i}
+    if(!pos&&go&&i-lastOpen>=1&&s.plan){const p=b.c,sw=!!s.plan.adds,n0=sw?N/3:N,q=n0/p;pos={i,side:s.dir,entry:p,q,openT:T,sl:s.plan.sl,tp:s.plan.tp,tp2:s.plan.tp2,pnl:-n0*fee,fee:n0*fee,tp1done:false,tr:false,sw,n0,adds:sw?[...s.plan.adds]:null,tpd:s.plan.tpd,maxH:s.plan.maxH,nAdd:0};lastOpen=i}
   }
   if(pos){fin(k15.length-1,k15[k15.length-1].c,'回测结束平仓')}
   return trades;
@@ -738,11 +759,11 @@ async function runOptimize(){
   const btn=$('#bOpt'),out=$('#optOut');btn.disabled=true;$('#bBt').disabled=true;let steps=0;const prog=()=>{out.innerHTML=`<div class="empty">正在下载 90 天 K 线…（${++steps}）</div>`};
   try{
     const sym=S.optSym||cfg.sym,D=await loadBtData(90,prog,sym),k15=D.k15,split=k15[k15.length-1].t-30*864e5,rows=[];
-    const runs=[['trend',4],['trend',12],['revert',12],['trend4h',12],['auto',8],['auto',12]];let k=0;
+    const runs=[['trend',12],['revert',12],['trend4h',12],['swing',12],['auto',8],['auto',12]];let k=0;
     for(const [mode,hold] of runs){k++;
       const sig=await sigChunked(D,hold,out,`${base(sym)} 第 ${k}/6 轮：${MODES[mode]}${NOHOLD(mode)?'':' · 窗口 '+hold+' 小时'}…`,90,mode);
       const tr=sig.filter(x=>k15[x.i].t<split),te=sig.filter(x=>k15[x.i].t>=split);
-      for(const minScore of (mode==='revert'?[50,60,70]:mode==='trend4h'?[50,65,80]:[60,70,80]))for(const f of [{cool:0,rrMin:0,name:'无过滤'},{cool:4,rrMin:1,name:'冷却+盈亏比≥1'}]){
+      for(const minScore of (mode==='revert'?[50,60,70]:(mode==='trend4h'||mode==='swing')?[50,65,80]:[60,70,80]))for(const f of [{cool:0,rrMin:0,name:'无过滤'},{cool:4,rrMin:1,name:'冷却+盈亏比≥1'}]){
         const o={minScore,cool:f.cool,rrMin:f.rrMin};
         rows.push({mode,hold,minScore,...f,tr:btStats(btSimulate(tr,k15,cfg.scale,o)),te:btStats(btSimulate(te,k15,cfg.scale,o))});
       }
@@ -756,7 +777,7 @@ function renderOptimize(){
   const rows=[...r.rows].sort((a,b)=>b.tr.total-a.tr.total),best=rows.find(x=>x.tr.n>=20)||rows[0];
   const isCur=x=>x.mode===(cfg.mode||'trend')&&(NOHOLD(x.mode)||x.hold===cfg.hold)&&x.minScore===cfg.minScore&&x.cool===cfg.cool&&x.rrMin===cfg.rrMin;
   const cell=s=>`<span class="${s.n?pc(s.total):'muted'}">${s.n?s.wr.toFixed(0)+'% · '+sg(s.total):'没开单'}</span><br><span class="muted">${s.n} 笔</span>`;
-  let v;if(best.tr.total<=0)v=`${base(r.sym)}：四种策略、${rows.length} 组参数在前 60 天全都亏钱。靠这些技术指标规则在这段行情里赚不到钱，需要换思路。`;
+  let v;if(best.tr.total<=0)v=`${base(r.sym)}：五种策略、${rows.length} 组参数在前 60 天全都亏钱。靠这些技术指标规则在这段行情里赚不到钱，需要换思路。`;
   else if(best.te.total>0)v=`${base(r.sym)}：前 60 天最好的一组，到后 30 天也还在赚（${sg(best.te.total)}）。可以采用，继续纸面跑验证。`;
   else v=`${base(r.sym)}：前 60 天最好的一组，到后 30 天就亏了（${sg(best.te.total)}）。说明它只是碰巧适合过去那段行情，不能信，下一步要改判断书的逻辑。`;
   out.innerHTML=`${r.demo?'<div class="demobar">演示数据跑的结果，没有参考意义。</div>':''}<div class="verdictline">${v}</div>
@@ -894,10 +915,10 @@ function renderJudge(){
 function renderHistory(){
   const groups=[...acct.hist].filter(g=>g.sym===cfg.sym);let html='<div id="histPos"></div>';
   const pos=acct.pos[cfg.sym];
-  const block=(g,open)=>{const fees=g.fills.reduce((a,f)=>a+f.fee,0),real=g.fills.reduce((a,f)=>a+(f.kind==='close'?f.pnl:-f.fee),0);
+  const block=(g,open)=>{const fees=g.fills.reduce((a,f)=>a+f.fee,0),real=g.fills.reduce((a,f)=>a+(f.kind==='close'||f.kind==='reduce'?f.pnl:-f.fee),0);
     return`<div class="day"><span class="d">${dayLabel(g.open)}</span><span class="num">${hhmm(g.open)} 开仓</span><span class="pill ${g.side==='LONG'?'long':'short'}">${g.side==='LONG'?'多':'空'}</span><span style="color:${open?'var(--p20)':'var(--ink-2)'};font-size:13px">${open?'持仓中':'已平完'}</span><span class="r ${pc(real)}">已实现 ${sg(real)}</span></div>
     <div class="muted" style="font-size:13px;margin-top:-6px">这一笔共 ${g.fills.length} 次成交 · 手续费 ${fmt(fees,2)}${g.demo?' · 示例数据':''}</div>
-    ${[...g.fills].reverse().map(f=>`<div class="fill"><div class="l1">${base(g.sym)} <span class="kind-${f.kind}">${{open:'开仓',close:'平仓',reduce:'减仓'}[f.kind]}</span><span class="${f.act==='买'?'up':'down'}">${f.act}</span><span class="paper">纸面</span><span class="t">${hms(f.time)}</span></div>
+    ${[...g.fills].reverse().map(f=>`<div class="fill"><div class="l1">${base(g.sym)} <span class="kind-${f.kind}">${{open:'开仓',close:'平仓',reduce:'减仓',add:'加仓'}[f.kind]}</span><span class="${f.act==='买'?'up':'down'}">${f.act}</span><span class="paper">纸面</span><span class="t">${hms(f.time)}</span></div>
     <div class="l2"><span class="v">${f.qty} @ ${fp(f.price)}</span>· 名义 ${fmt(f.notional,2)} · 费 ${fmt(f.fee,2)} · <b class="${pc(f.pnl)}" style="font-size:15px">${sg(f.pnl)}</b></div><div class="l3">${f.note}</div></div>`).join('')}`};
   if(pos)html+=block(pos,true);
   groups.forEach(g=>html+=block(g,false));
