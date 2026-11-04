@@ -134,11 +134,21 @@ button{cursor:pointer}
 .btkv span{color:var(--ink-2)} .btkv b{text-align:right;font-weight:700}
 .btrow{display:grid;grid-template-columns:auto auto 1fr auto;gap:8px;align-items:center;font-size:12.5px;padding:8px 0;border-bottom:1px dashed var(--line)}
 .btrow:last-child{border-bottom:0}
-.opt{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:500px}
+.opt{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums;min-width:540px}
 .opt th{font-weight:600;color:var(--ink-2);text-align:left;padding:6px 6px;border-bottom:1px solid var(--line)}
 .opt td{padding:7px 6px;border-bottom:1px dashed var(--line);vertical-align:top;line-height:1.35}
 .opt tr.best td{background:var(--accent-soft)} .opt tr.best td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
 .opt tr.cur td{outline:1px dashed var(--ink-3);outline-offset:-1px}
+.coin{display:flex;flex-direction:column;gap:4px}
+.coin .t{font-weight:800;font-size:16px;display:flex;align-items:center;gap:6px}
+.coin .v{font-weight:800;font-size:18px}
+.coin .r{font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.ev{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:8px 0;border-bottom:1px dashed var(--line)}
+.ev:last-child{border-bottom:0}
+.ev b{font-size:14px} .ev .in{color:var(--warn);font-weight:700;font-family:var(--f-num)} .ev span{font-size:12px;color:var(--ink-2)}
+.npill{display:flex;gap:8px} .npill div{flex:1;text-align:center;border-radius:12px;padding:8px 0;font-weight:800}
+.nitem{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;line-height:1.5}
+.nitem:last-child{border-bottom:0} .nitem a{color:var(--ink);text-decoration:none} .nitem small{color:var(--ink-2)}
 .verdictline{font-size:14px;line-height:1.6;padding:10px 12px;border-radius:12px;background:var(--accent-soft)}
 .paper{font-size:11px;color:var(--warn);background:var(--warn-soft);border-radius:5px;padding:1px 5px;font-weight:600}
 .posbox{border:1.5px solid var(--violet);background:linear-gradient(180deg,var(--accent-soft),var(--surface))}
@@ -279,7 +289,7 @@ a{color:var(--accent)}
     </div>
     <div class="card">
       <h2 class="h2">自动找更好的参数</h2>
-      <div class="note" style="margin-top:6px">把六种策略（趋势跟随、区间回归、4 小时趋势、大方向加仓、顺势做反弹、自动切换）和不同的开仓线、持仓窗口、过滤条件组合起来，一共 36 组，各回测一遍。用前 60 天挑参数，后 30 天检验，防止挑到只是碰巧好看的参数。大约要 1 分钟。可以分别在 ETH 和 BTC 上跑，两个都赚的规则才更可信。</div>
+      <div class="note" style="margin-top:6px">把六种策略（趋势跟随、区间回归、4 小时趋势、大方向加仓、顺势做反弹、自动切换）和不同的开仓线、持仓窗口、过滤条件（含「只在整点判断」）组合起来，一共 54 组，各回测一遍。用前 60 天挑参数，后 30 天检验，防止挑到只是碰巧好看的参数。大约要 1 分钟。可以分别在 ETH 和 BTC 上跑，两个都赚的规则才更可信。</div>
       <div class="seg" id="optSym" style="margin-top:12px"><button data-s="ETHUSDT">ETH</button><button data-s="BTCUSDT">BTC</button><button data-s="SOLUSDT">SOL</button></div>
       <div class="btnrow" style="margin-top:12px"><button class="btn primary" id="bOpt">开始寻找</button></div>
       <div id="optOut" style="margin-top:12px;display:flex;flex-direction:column;gap:12px"></div>
@@ -288,6 +298,10 @@ a{color:var(--accent)}
 
   <!-- 舆情 -->
   <section class="view" id="v-sentiment">
+    <div class="label" style="text-align:right">只看 · 不参与开平仓</div>
+    <div class="grid2" id="coinCards"></div>
+    <div class="card soft"><h2 class="h2">前瞻宏观 <span class="label">未来 48 小时 · 高影响</span></h2><div id="macro" style="margin-top:8px"></div></div>
+    <div class="card"><h2 class="h2">新闻脉冲 <span class="label" id="newsSrc"></span></h2><div id="newsSum" style="margin-top:10px"></div><div id="newsList" style="margin-top:8px"></div></div>
     <div class="card">
       <h2 class="h2">恐惧与贪婪指数 <span class="label">全市场 · 日更</span></h2>
       <svg class="gauge" id="fng" viewBox="0 0 240 140"></svg>
@@ -328,6 +342,7 @@ a{color:var(--accent)}
       <div class="field"><label for="cMin">最低开仓评分<small>判断书评分达到才开仓</small></label><input type="number" id="cMin" min="0" max="100" step="5"></div>
       <div class="field"><label for="cHold">持仓窗口（小时）<small>决定 P50 / P20 区间宽度</small></label><input type="number" id="cHold" min="1" max="48" step="1"></div>
       <div class="field"><label for="cAuto">自动跟判断书开平仓<small>每分钟检查一次，只在纸面执行</small></label><input type="checkbox" class="switch" id="cAuto"></div>
+      <div class="field"><label for="cHourly">只在整点判断开仓<small>等 1 小时 K 线收盘后（整点 5 分钟内）才判断一次，不追没走完的急涨急跌；止盈止损照常实时盯</small></label><input type="checkbox" class="switch" id="cHourly"></div>
       <div class="field"><label for="cTpsl">自动止盈止损<small>止盈 P50 对侧，止损 P50 外侧</small></label><input type="checkbox" class="switch" id="cTpsl"></div>
       <div class="field"><label for="cTrail">移动止损<small>浮盈到目标一半时把止损挪过开仓价（不分批时生效）</small></label><input type="checkbox" class="switch" id="cTrail"></div>
       <div class="field"><label for="cCool">止损后冷却（小时）<small>被止损后，这么久之内不再同方向开仓；0 = 不限制</small></label><input type="number" id="cCool" min="0" max="48" step="1"></div>
@@ -351,7 +366,7 @@ a{color:var(--accent)}
       </ol>
     </div>
     <div class="card">
-      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-04 · 第 13 版</span></h2>
+      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-04 · 第 14 版</span></h2>
       <div class="btnrow" style="margin-top:10px"><button class="btn danger" id="bReset" style="grid-column:1/-1">重置纸面账户</button></div>
     </div>
   </section>
@@ -382,7 +397,7 @@ const DP={ETHUSDT:2,BTCUSDT:1,SOLUSDT:3};
 function sget(k,d){try{const v=localStorage.getItem('pj_'+k);return v?JSON.parse(v):d}catch(e){return d}}
 function sset(k,v){try{localStorage.setItem('pj_'+k,JSON.stringify(v))}catch(e){}}
 
-const cfg=Object.assign({sym:'ETHUSDT',tf:'1h',view:'overview',notional:400,lev:10,fee:0.05,start:1000,minScore:60,hold:4,auto:true,tpsl:true,trail:true,scale:true,cool:0,rrMin:0,rebate:0,mode:'trend'},sget('cfg',{}));
+const cfg=Object.assign({sym:'ETHUSDT',tf:'1h',view:'overview',notional:400,lev:10,fee:0.05,start:1000,minScore:60,hold:4,auto:true,tpsl:true,trail:true,scale:true,cool:0,rrMin:0,rebate:0,mode:'trend',hourly:false},sget('cfg',{}));
 const S={src:'demo',diag:[],live:false,kl:{},price:0,chg:0,judge:null,senti:null,ws:null,demoP:{...DEMO_BASE},lastAuto:0};
 let acct=null;
 function acctKey(){return 'acct_'+(S.live?'live':'demo')}
@@ -671,9 +686,13 @@ function renderLog(){
    <div class="label" style="margin:10px 0 4px">状态变化（最近 8 次，时间是这段状态开始的时候）</div>
    ${ch.slice(-8).reverse().map(c=>`<div class="btrow" style="grid-template-columns:auto 1fr"><span class="num muted">${hhmm(c.t)}</span><span>${c.k}<br><span class="muted" style="font-size:12px">${c.r}</span></span></div>`).join('')}`;
 }
+function closedJudge(){const now=Date.now(),f=(k,ms)=>k.filter(x=>x.t+ms<=now);
+  const k4=f(S.kl[cfg.sym+'4h'],144e5),k1=f(S.kl[cfg.sym+'1h'],36e5),k15=f(S.kl[cfg.sym+'15m'],9e5);
+  if(k4.length<60||k1.length<100||k15.length<60)return null;return{...judgeCore(k4,k1,k15,k15[k15.length-1].c),at:now}}
 function autoTrade(){
-  if(!cfg.auto||!S.judge||!S.live)return;const j=S.judge,pos=acct.pos[cfg.sym];
-  const ok=j.go&&passFilter(j.dir,j.plan,Date.now(),(acct.lastStop||{})[cfg.sym],cfg);logCheck(j,ok);
+  if(!cfg.auto||!S.judge||!S.live)return;let j=S.judge;const pos=acct.pos[cfg.sym];
+  if(cfg.hourly){const now=Date.now(),h=Math.floor(now/36e5);if(S.lastHour===h||now%36e5>5*60e3)return;S.lastHour=h;const cj=closedJudge();if(!cj)return;j=cj}
+  const ok=j.go&&passFilter(j.dir,j.plan,Date.now(),(acct.lastStop||{})[cfg.sym],cfg);logCheck(j,ok);if(cfg.hourly)S.lastAuto=0;
   if(pos&&ok&&j.dir!==pos.side){closePos(cfg.sym,'判断书反向信号');}
   if(!acct.pos[cfg.sym]&&ok&&Date.now()-S.lastAuto>15*60e3){S.lastAuto=Date.now();openPos(j.dir,'判断书趋势 '+j.dir+'：'+j.items.filter(x=>x.s!=='bad').map(x=>x.t).join('；'),j.plan)}
 }
@@ -749,7 +768,7 @@ function btSimulate(sig,k15,scale,o={}){
         if(reach(pos.tp))fin(i,pos.tp,'止盈');
         else if(trail&&!pos.tr){const goal=Math.abs(pos.tp-pos.entry);if((sh?pos.entry-fav:fav-pos.entry)>=goal*.5){pos.sl=sh?pos.entry-goal*.2:pos.entry+goal*.2;pos.tr=true}}
       }}
-    const go=s.dir!=='WAIT'&&s.score>=ms&&passFilter(s.dir,s.plan,T,last,o);
+    const go=s.dir!=='WAIT'&&s.score>=ms&&(!o.hourly||s.hr)&&passFilter(s.dir,s.plan,T,last,o);
     if(pos&&go&&s.dir!==pos.side)fin(i,b.c,'反向信号');
     if(!pos&&go&&i-lastOpen>=1&&s.plan){const p=b.c,sw=!!s.plan.adds,n0=sw?N/3:N,q=n0/p;pos={i,side:s.dir,entry:p,q,openT:T,sl:s.plan.sl,tp:s.plan.tp,tp2:s.plan.tp2,pnl:-n0*fee,fee:n0*fee,tp1done:false,tr:false,sw,n0,adds:sw?[...s.plan.adds]:null,tpd:s.plan.tpd,maxH:s.plan.maxH,nAdd:0};lastOpen=i}
   }
@@ -760,7 +779,7 @@ function genSig(k15,k1,k4,hold,from,to,mode){
   const sig=[];let a=0,b=0;
   for(let i=from;i<to;i++){const T=k15[i].t+9e5;while(a+1<k1.length&&k1[a+1].t+36e5<=T)a++;while(b+1<k4.length&&k4[b+1].t+144e5<=T)b++;
     const j=judgeCore(k4.slice(Math.max(0,b-219),b+1),k1.slice(Math.max(0,a-759),a+1),k15.slice(i-199,i+1),k15[i].c,{lite:true,hold,mode});
-    sig.push({i,dir:j.dir,score:j.score,plan:j.plan})}
+    sig.push({i,dir:j.dir,score:j.score,plan:j.plan,hr:T%36e5===0})}
   return sig;
 }
 function btStats(tr){
@@ -784,7 +803,7 @@ async function runBacktest(days){
   const btn=$('#bBt'),out=$('#btOut');btn.disabled=true;$('#bOpt').disabled=true;let steps=0;const prog=()=>{out.innerHTML=`<div class="empty">正在下载历史 K 线…（${++steps}）</div>`};
   try{
     const D=await loadBtData(days,prog),sig=await sigChunked(D,cfg.hold,out,'正在逐根回放判断书…',days),k15=D.k15,o={cool:cfg.cool,rrMin:cfg.rrMin};
-    const ttA=btSimulate(sig,k15,false,o),B=btSimulate(sig,k15,true,o);
+    o.hourly=!!cfg.hourly;const ttA=btSimulate(sig,k15,false,o),B=btSimulate(sig,k15,true,o);
     S.bt={days,A:btStats(ttA),B:btStats(B),trades:B,ttA,from:k15[sig[0].i].t,to:k15[k15.length-1].t,sym:cfg.sym,demo:!S.live,src:S.src};
     renderBacktest();
   }catch(e){out.innerHTML=`<div class="empty">回测没跑完：${e.message||'下载 K 线失败'}。检查网络后再试一次。</div>`}
@@ -798,8 +817,8 @@ async function runOptimize(){
     for(const [mode,hold] of runs){k++;
       const sig=await sigChunked(D,hold,out,`${base(sym)} 第 ${k}/6 轮：${MODES[mode]}${NOHOLD(mode)?'':' · 窗口 '+hold+' 小时'}…`,90,mode);
       const tr=sig.filter(x=>k15[x.i].t<split),te=sig.filter(x=>k15[x.i].t>=split);
-      for(const minScore of (mode==='revert'?[50,60,70]:(mode==='trend4h'||mode==='swing'||mode==='rally')?[50,65,80]:[60,70,80]))for(const f of [{cool:0,rrMin:0,name:'无过滤'},{cool:4,rrMin:1,name:'冷却+盈亏比≥1'}]){
-        const o={minScore,cool:f.cool,rrMin:f.rrMin};
+      for(const minScore of (mode==='revert'?[50,60,70]:(mode==='trend4h'||mode==='swing'||mode==='rally')?[50,65,80]:[60,70,80]))for(const f of [{cool:0,rrMin:0,name:'无过滤'},{cool:4,rrMin:1,name:'冷却+盈亏比≥1'},{cool:4,rrMin:1,hourly:true,name:'整点+冷却+盈亏比≥1'}]){
+        const o={minScore,cool:f.cool,rrMin:f.rrMin,hourly:!!f.hourly};
         rows.push({mode,hold,minScore,...f,tr:btStats(btSimulate(tr,k15,cfg.scale,o)),te:btStats(btSimulate(te,k15,cfg.scale,o))});
       }
     }
@@ -810,7 +829,7 @@ async function runOptimize(){
 function renderOptimize(){
   const r=S.opt,out=$('#optOut');if(!r)return;
   const rows=[...r.rows].sort((a,b)=>b.tr.total-a.tr.total),best=rows.find(x=>x.tr.n>=20)||rows[0];
-  const isCur=x=>x.mode===(cfg.mode||'trend')&&(NOHOLD(x.mode)||x.hold===cfg.hold)&&x.minScore===cfg.minScore&&x.cool===cfg.cool&&x.rrMin===cfg.rrMin;
+  const isCur=x=>x.mode===(cfg.mode||'trend')&&(NOHOLD(x.mode)||x.hold===cfg.hold)&&x.minScore===cfg.minScore&&x.cool===cfg.cool&&x.rrMin===cfg.rrMin&&!!x.hourly===!!cfg.hourly;
   const cell=s=>`<span class="${s.n?pc(s.total):'muted'}">${s.n?s.wr.toFixed(0)+'% · '+sg(s.total):'没开单'}</span><br><span class="muted">${s.n} 笔</span>`;
   let v;if(best.tr.total<=0)v=`${base(r.sym)}：多种策略、${rows.length} 组参数在前 60 天全都亏钱。靠这些技术指标规则在这段行情里赚不到钱，需要换思路。`;
   else if(best.te.total>0)v=`${base(r.sym)}：前 60 天最好的一组，到后 30 天也还在赚（${sg(best.te.total)}）。可以采用，继续纸面跑验证。`;
@@ -820,7 +839,7 @@ function renderOptimize(){
   ${rows.slice(0,10).concat(rows.slice(10).filter(isCur)).map(x=>`<tr class="${x===best?'best':''} ${isCur(x)?'cur':''}"><td>${MODES[x.mode]}</td><td>${x.minScore}</td><td>${NOHOLD(x.mode)?'—':x.hold+'h'}</td><td>${x.name}</td><td>${cell(x.tr)}</td><td>${cell(x.te)}</td></tr>`).join('')}</tbody></table></div>
   <div class="note">紫框是前 60 天最好的一组，虚线是你现在用的设置。只在前 60 天里挑参数，再看它在没参与挑选的后 30 天表现如何，这样才能判断它是真的好还是碰巧。</div>
   ${best.tr.total>0&&best.te.total>0&&!isCur(best)?`<div class="btnrow"><button class="btn primary" id="bApply">采用这组：${MODES[best.mode]} · 开仓线 ${best.minScore}${NOHOLD(best.mode)?'':' · 窗口 '+best.hold+'h'} · ${best.name}</button></div>`:''}`;
-  const ap=document.getElementById('bApply');if(ap)ap.onclick=()=>{Object.assign(cfg,{mode:best.mode,minScore:best.minScore,hold:best.hold,cool:best.cool,rrMin:best.rrMin});saveCfg();$('#cMode').value=cfg.mode;
+  const ap=document.getElementById('bApply');if(ap)ap.onclick=()=>{Object.assign(cfg,{mode:best.mode,minScore:best.minScore,hold:best.hold,cool:best.cool,rrMin:best.rrMin,hourly:!!best.hourly});saveCfg();$('#cHourly').checked=cfg.hourly;$('#cMode').value=cfg.mode;
     [['cMin','minScore'],['cHold','hold'],['cCool','cool'],['cRr','rrMin']].forEach(([id,k])=>$('#'+id).value=cfg[k]);runJudge();renderJudge();setPriceLines();renderOptimize();toast('已采用新参数')};
 }
 const floatPnl=pos=>(pos.side==='LONG'?S.price-pos.entry:pos.entry-S.price)*pos.qty;
@@ -888,7 +907,44 @@ function setMarkers(){
 }
 
 /* ---------- sentiment ---------- */
+async function loadCoinCards(){
+  const out=[];
+  for(const sym of ['ETHUSDT','BTCUSDT']){try{
+    let j;if(sym===cfg.sym&&S.judge)j=S.judge;else{const [k4,k1,k15]=await Promise.all([klines(sym,'4h',300),klines(sym,'1h',800),klines(sym,'15m',300)]);j=judgeCore(k4,k1,k15,k15[k15.length-1].c)}
+    out.push({sym,j})}catch(e){out.push({sym,j:null})}}
+  $('#coinCards').innerHTML=out.map(({sym,j})=>{if(!j)return`<div class="card coin"><div class="t">${base(sym)}</div><div class="r">暂时取不到</div></div>`;
+    const v=j.dir==='WAIT'?'等待':!j.go?'观望（'+dirTxt[j.dir]+'）':j.dir==='LONG'?'趋势多':'趋势空',c=j.go?(j.dir==='LONG'?'up':'down'):'muted',ic=j.go?(j.dir==='LONG'?'↗':'↘'):'⏸';
+    const rs=(j.items||[]).filter(x=>x.s!=='ok'||j.go).slice(0,2).map(x=>x.t).join('；')||j.summary;
+    return`<div class="card coin"><div class="t"><span class="${c}">${ic}</span>${base(sym)}<span class="pill acc" style="margin-left:auto">${j.score}</span></div><div class="v ${c}">${v}</div><div class="r">${rs}</div></div>`}).join('');
+}
+const CC={USD:'美国',EUR:'欧元区',GBP:'英国',JPY:'日本',CNY:'中国',CAD:'加拿大',AUD:'澳洲',CHF:'瑞士',NZD:'新西兰'};
+const EVT=[[/non-?farm/i,'非农就业'],[/unemployment rate/i,'失业率'],[/core cpi/i,'核心 CPI'],[/\bcpi\b/i,'CPI 通胀'],[/core pce/i,'核心 PCE'],[/\bppi\b/i,'PPI'],[/fomc.*(minutes)/i,'美联储会议纪要'],[/fomc|federal funds|fed interest rate/i,'美联储利率决议'],[/fed chair|powell/i,'美联储主席讲话'],[/(official bank rate|cash rate|interest rate|rate decision|policy rate)/i,'央行利率决议'],[/monetary policy (report|summary|statement)/i,'央行货币政策报告'],[/press conference/i,'央行发布会'],[/gdp/i,'GDP'],[/retail sales/i,'零售销售'],[/ism.*(manufacturing|services)/i,'ISM 指数'],[/jolts/i,'JOLTS 职位空缺'],[/jobless claims/i,'初请失业金'],[/employment change|adp/i,'就业人数变化']];
+const evName=t=>{for(const [r,n] of EVT)if(r.test(t))return n;return t};
+async function loadMacro(){
+  const el=$('#macro');try{
+    const d=await getJSON('https://nfs.faireconomy.media/ff_calendar_thisweek.json',8000),now=Date.now();
+    const ev=d.filter(x=>x.impact==='High').map(x=>({...x,t:Date.parse(x.date)})).filter(x=>x.t>now-36e5&&x.t<now+48*36e5).sort((a,b)=>a.t-b.t);
+    if(!ev.length){el.innerHTML='<div class="empty">未来 48 小时没有高影响宏观事件</div>';return}
+    el.innerHTML=ev.slice(0,8).map(x=>{const dh=(x.t-now)/36e5,dt=new Date(x.t);return`<div class="ev"><b>${CC[x.country]||x.country} · ${evName(x.title)}</b><span class="in">${dh<0?'已公布':dh.toFixed(1)+'h'}</span><span>${dt.getMonth()+1}月${dt.getDate()}日 ${hhmm(x.t)} 公布${x.forecast?' · 预期 '+x.forecast:''}${x.previous?' · 前值 '+x.previous:''}</span><span></span></div>`}).join('');
+  }catch(e){el.innerHTML='<div class="empty">宏观日历暂时取不到（数据源连不上）</div>'}
+}
+const BULL=/上涨|大涨|拉升|突破|增持|买入|流入|净流入|批准|通过|利好|看涨|新高|反弹|降息|surge|soar|rall|jump|gain|bull|inflow|approv|buy|record high|rebound|rate cut/i;
+const BEAR=/下跌|大跌|暴跌|跌破|抛售|减持|卖出|流出|净流出|清算|爆仓|黑客|被盗|攻击|利空|看跌|新低|起诉|调查|加息|plunge|drop|fall|crash|slump|bear|outflow|sell|hack|exploit|liquidat|lawsuit|sue|probe|rate hike/i;
+function findItems(o,d=0){if(!o||d>4)return null;if(Array.isArray(o)&&o.length&&typeof o[0]==='object'&&('title' in o[0]))return o;if(typeof o==='object')for(const k in o){const r=findItems(o[k],d+1);if(r)return r}return null}
+async function loadNews(){
+  const srcs=[['律动 BlockBeats','https://api.theblockbeats.news/v1/open-api/open-flash?size=20&page=1&type=push&lang=cn'],['CryptoCompare','https://min-api.cryptocompare.com/data/v2/news/?lang=EN']];
+  for(const [name,url] of srcs){try{const d=await getJSON(url,8000),arr=findItems(d);if(!arr||!arr.length)continue;
+    const items=arr.slice(0,25).map(x=>{const raw=x.create_time??x.published_on??x.add_time??x.time,t=raw?(+raw<1e12?+raw*1000:+raw):Date.parse(x.published_at||x.date||'');const txt=(x.title||'')+' '+(x.content||x.body||'').slice(0,200).replace(/<[^>]+>/g,'');
+      const b=BULL.test(txt),r=BEAR.test(txt);return{title:(x.title||'').replace(/<[^>]+>/g,''),url:x.link||x.url||'',t,tag:b&&!r?'多':r&&!b?'空':'中'}});
+    const n={多:0,空:0,中:0};items.forEach(x=>n[x.tag]++);
+    $('#newsSrc').textContent=name;
+    $('#newsSum').innerHTML=`<div class="npill"><div class="pill long" style="justify-content:center">多 ${n['多']}</div><div class="pill short" style="justify-content:center">空 ${n['空']}</div><div class="pill wait" style="justify-content:center">中 ${n['中']}</div></div><div class="note" style="margin-top:6px">按标题关键词粗分，仅供参考；新闻和情绪只看，开平仓只认判断书。</div>`;
+    $('#newsList').innerHTML=items.slice(0,10).map(x=>`<div class="nitem"><span class="pill ${x.tag==='多'?'long':x.tag==='空'?'short':'wait'}">${x.tag}</span><div>${x.url?`<a href="${x.url}" target="_blank" rel="noopener">${x.title}</a>`:x.title}<br><small>${x.t?hhmm(x.t):''}</small></div></div>`).join('');
+    return}catch(e){}}
+  $('#newsSrc').textContent='';$('#newsSum').innerHTML='<div class="empty">新闻源暂时取不到（数据源连不上）</div>';$('#newsList').innerHTML='';
+}
 async function loadSenti(){
+  loadCoinCards();loadMacro();loadNews();
   const sym=cfg.sym;let d={};
   if(S.live&&S.src==='spot'){d.spotOnly=true}
   else if(S.live){
@@ -1021,7 +1077,7 @@ $('#bLong').onclick=()=>openPos('LONG','手动开多',null);$('#bShort').onclick
 $('#bClose').onclick=()=>closePos(cfg.sym,'手动平仓');
 const binds=[['cNotional','notional'],['cLev','lev'],['cFee','fee'],['cStart','start'],['cMin','minScore'],['cHold','hold'],['cCool','cool'],['cRr','rrMin'],['cRebate','rebate']];
 binds.forEach(([id,k])=>{const el=$('#'+id);el.value=cfg[k];el.onchange=()=>{const v=parseFloat(el.value);if(!isNaN(v)){cfg[k]=v;saveCfg();if(k==='minScore'||k==='hold'){runJudge();renderJudge();setPriceLines()}toast('已保存')}}});
-[['cAuto','auto'],['cTpsl','tpsl'],['cTrail','trail'],['cScale','scale']].forEach(([id,k])=>{const el=$('#'+id);el.checked=cfg[k];el.onchange=()=>{cfg[k]=el.checked;saveCfg();renderPosCards();renderJudge();renderBacktest();toast(el.checked?'已开启':'已关闭')}});
+[['cAuto','auto'],['cTpsl','tpsl'],['cTrail','trail'],['cScale','scale'],['cHourly','hourly']].forEach(([id,k])=>{const el=$('#'+id);el.checked=cfg[k];el.onchange=()=>{cfg[k]=el.checked;saveCfg();renderPosCards();renderJudge();renderBacktest();toast(el.checked?'已开启':'已关闭')}});
 $('#bRetry').onclick=()=>connect();
 let btDays=30;$('#btRange').onclick=e=>{const b=e.target.closest('button');if(!b)return;btDays=+b.dataset.d;document.querySelectorAll('#btRange button').forEach(x=>x.classList.toggle('on',x===b))};
 $('#bBt').onclick=()=>runBacktest(btDays);
