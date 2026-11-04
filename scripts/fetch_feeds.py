@@ -1,4 +1,5 @@
-import json, time, urllib.request, os
+import json, time, urllib.request, os, re, email.utils
+import xml.etree.ElementTree as ET
 UA={'User-Agent':'Mozilla/5.0 (feeds bot)'}
 def get(url):
     with urllib.request.urlopen(urllib.request.Request(url,headers=UA),timeout=20) as r:
@@ -35,3 +36,18 @@ for name,url in [('律动 BlockBeats','https://api.theblockbeats.news/v1/open-ap
         json.dump({'at':now,'src':name,'items':out},open('data/news.json','w'),ensure_ascii=False)
         break
     except Exception as e: print('news fail',name,e)
+
+if not os.path.exists('data/news.json') or json.load(open('data/news.json')).get('at')!=now:
+    for name,url in [('Cointelegraph','https://cointelegraph.com/rss'),('CoinDesk','https://www.coindesk.com/arc/outboundfeeds/rss/'),('Decrypt','https://decrypt.co/feed')]:
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url,headers=UA),timeout=20) as r: root=ET.fromstring(r.read())
+            out=[]
+            for it in root.iter('item'):
+                g=lambda k:(it.findtext(k) or '').strip()
+                try: t=int(email.utils.parsedate_to_datetime(g('pubDate')).timestamp()*1000)
+                except Exception: t=None
+                out.append({'title':g('title'),'content':re.sub('<[^>]+>','',g('description'))[:300],'url':g('link'),'t':t})
+                if len(out)>=30: break
+            if out:
+                json.dump({'at':now,'src':name,'items':out},open('data/news.json','w'),ensure_ascii=False); print('news ok',name); break
+        except Exception as e: print('rss fail',name,e)
