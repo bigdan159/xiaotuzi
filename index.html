@@ -235,6 +235,10 @@ a{color:var(--accent)}
       <h2 class="h2">判断书 <button class="more" data-go="judge">展开 ›</button></h2>
       <div id="ovJudge" style="margin-top:10px"></div>
     </div>
+    <div class="card">
+      <h2 class="h2">自动跟单运行记录 <span class="label" style="margin-left:auto">最近 24 小时</span></h2>
+      <div id="ovLog" style="margin-top:10px"></div>
+    </div>
   </section>
 
   <!-- 判断 -->
@@ -347,7 +351,7 @@ a{color:var(--accent)}
       </ol>
     </div>
     <div class="card">
-      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-02 · 第 9 版</span></h2>
+      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-04 · 第 10 版</span></h2>
       <div class="btnrow" style="margin-top:10px"><button class="btn danger" id="bReset" style="grid-column:1/-1">重置纸面账户</button></div>
     </div>
   </section>
@@ -599,9 +603,31 @@ function passFilter(dir,plan,t,lastStop,o){
   if(o.cool&&lastStop&&lastStop[dir]&&t-lastStop[dir]<o.cool*36e5)return false;
   return true;
 }
+function logCheck(j,ok){try{
+  const L=sget('runlog_'+cfg.sym,[]),why=j.go&&!ok?(cfg.rrMin&&j.plan&&j.plan.rr<cfg.rrMin?'rr':'cool'):'';
+  L.push([Date.now(),j.dir,j.score,j.go?1:0,ok?1:0,why,((j.items||[])[0]||{}).t||'',j.plan?+j.plan.rr.toFixed(2):0]);
+  while(L.length>3000)L.shift();sset('runlog_'+cfg.sym,L);renderLog()}catch(e){}}
+function renderLog(){
+  const el=document.getElementById('ovLog');if(!el)return;const now=Date.now(),L=sget('runlog_'+cfg.sym,[]).filter(x=>now-x[0]<864e5);
+  if(!L.length){el.innerHTML=`<div class="empty">${cfg.auto?'还没有记录。自动跟单开着时，判断书每分钟检查一次，会记在这里。':'这台手机关闭了自动跟单，所以没有记录。'}</div>`;return}
+  const wait=L.filter(x=>x[1]==='WAIT').length,low=L.filter(x=>x[1]!=='WAIT'&&!x[3]).length,flt=L.filter(x=>x[3]&&!x[4]),go=L.filter(x=>x[4]).length;
+  const mx=L.reduce((a,x)=>x[2]>a[2]?x:a,L[0]),span=(now-L[0][0])/36e5,exp=Math.round(span*60);
+  const cat=x=>x[4]?'go':x[3]?'f'+x[5]:x[1]==='WAIT'?'w':'low'+x[1];
+  const txt=(x,m)=>x[4]?'达到开仓条件':x[3]?(x[5]==='rr'?`达到开仓线，但盈亏比 ${x[7]} 不够`:'达到开仓线，但在止损冷却中'):x[1]==='WAIT'?'观望':`${dirTxt[x[1]]}，最高评分 ${m} 没到 ${cfg.minScore}`;
+  const ch=[];for(const x of L){const c=cat(x);if(!ch.length||ch[ch.length-1].c!==c)ch.push({c,t:x[0],r:x[6],x,m:x[2]});else{const l=ch[ch.length-1];l.m=Math.max(l.m,x[2]);l.r=x[6]}}
+  ch.forEach(c=>c.k=txt(c.x,c.m));
+  const row=(k,v)=>`<div class="btrow" style="grid-template-columns:1fr auto"><span>${k}</span><b class="num">${v}</b></div>`;
+  el.innerHTML=`<div class="grid2">
+    <div class="stat"><span class="label">检查次数</span><b>${L.length} <span class="muted" style="font-size:12px">/ 应有约 ${exp}</span></b></div>
+    <div class="stat"><span class="label">最高评分</span><b>${mx[2]} <span class="muted" style="font-size:12px">${hhmm(mx[0])} ${mx[1]==='WAIT'?'':dirTxt[mx[1]]}</span></b></div></div>
+   ${L.length<exp*.8?'<div class="demobar" style="margin-top:10px">检查次数明显少于应有次数：这段时间里 App 有一段没在前台运行（锁屏、退到后台或卡住），那段时间不会开单。</div>':''}
+   <div style="margin-top:8px">${row('观望（行情不明或条件不齐）',wait)}${row('有方向，但评分没到开仓线',low)}${row('达到开仓线，但被过滤（盈亏比 / 冷却）',flt.length)}${row('达到开仓条件',go)}</div>
+   <div class="label" style="margin:10px 0 4px">状态变化（最近 8 次，时间是这段状态开始的时候）</div>
+   ${ch.slice(-8).reverse().map(c=>`<div class="btrow" style="grid-template-columns:auto 1fr"><span class="num muted">${hhmm(c.t)}</span><span>${c.k}<br><span class="muted" style="font-size:12px">${c.r}</span></span></div>`).join('')}`;
+}
 function autoTrade(){
   if(!cfg.auto||!S.judge)return;const j=S.judge,pos=acct.pos[cfg.sym];
-  const ok=j.go&&passFilter(j.dir,j.plan,Date.now(),(acct.lastStop||{})[cfg.sym],cfg);
+  const ok=j.go&&passFilter(j.dir,j.plan,Date.now(),(acct.lastStop||{})[cfg.sym],cfg);logCheck(j,ok);
   if(pos&&ok&&j.dir!==pos.side){closePos(cfg.sym,'判断书反向信号');}
   if(!acct.pos[cfg.sym]&&ok&&Date.now()-S.lastAuto>15*60e3){S.lastAuto=Date.now();openPos(j.dir,'判断书趋势 '+j.dir+'：'+j.items.filter(x=>x.s!=='bad').map(x=>x.t).join('；'),j.plan)}
 }
@@ -903,7 +929,7 @@ function renderSenti(){
   if(d.demo)R.push({s:'warn',t:'以上是演示数据，部署到能访问币安的网址后会换成真实数据'});
   $('#sentiRead').innerHTML=R.map(i=>`<li><span class="ic ${i.s}">${i.s==='ok'?'✓':'!'}</span><span>${i.t}</span></li>`).join('');
 }
-function renderAll(){renderTicker();renderEquity();renderJudge();renderHistory();setPriceLines();setMarkers();
+function renderAll(){renderLog();renderTicker();renderEquity();renderJudge();renderHistory();setPriceLines();setMarkers();
   $('#tvLink').href=`https://www.tradingview.com/chart/?symbol=BINANCE:${cfg.sym}.P`}
 
 function renderBacktest(){
