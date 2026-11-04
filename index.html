@@ -366,7 +366,7 @@ a{color:var(--accent)}
       </ol>
     </div>
     <div class="card">
-      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-04 · 第 14 版</span></h2>
+      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-04 · 第 15 版</span></h2>
       <div class="btnrow" style="margin-top:10px"><button class="btn danger" id="bReset" style="grid-column:1/-1">重置纸面账户</button></div>
     </div>
   </section>
@@ -922,7 +922,7 @@ const EVT=[[/non-?farm/i,'非农就业'],[/unemployment rate/i,'失业率'],[/co
 const evName=t=>{for(const [r,n] of EVT)if(r.test(t))return n;return t};
 async function loadMacro(){
   const el=$('#macro');try{
-    const d=await getJSON('https://nfs.faireconomy.media/ff_calendar_thisweek.json',8000),now=Date.now();
+    let d;try{d=(await getJSON('data/macro.json?'+Math.floor(Date.now()/6e5),8000)).items}catch(e){d=await getJSON('https://nfs.faireconomy.media/ff_calendar_thisweek.json',8000)}const now=Date.now();
     const ev=d.filter(x=>x.impact==='High').map(x=>({...x,t:Date.parse(x.date)})).filter(x=>x.t>now-36e5&&x.t<now+48*36e5).sort((a,b)=>a.t-b.t);
     if(!ev.length){el.innerHTML='<div class="empty">未来 48 小时没有高影响宏观事件</div>';return}
     el.innerHTML=ev.slice(0,8).map(x=>{const dh=(x.t-now)/36e5,dt=new Date(x.t);return`<div class="ev"><b>${CC[x.country]||x.country} · ${evName(x.title)}</b><span class="in">${dh<0?'已公布':dh.toFixed(1)+'h'}</span><span>${dt.getMonth()+1}月${dt.getDate()}日 ${hhmm(x.t)} 公布${x.forecast?' · 预期 '+x.forecast:''}${x.previous?' · 前值 '+x.previous:''}</span><span></span></div>`}).join('');
@@ -932,9 +932,10 @@ const BULL=/上涨|大涨|拉升|突破|增持|买入|流入|净流入|批准|�
 const BEAR=/下跌|大跌|暴跌|跌破|抛售|减持|卖出|流出|净流出|清算|爆仓|黑客|被盗|攻击|利空|看跌|新低|起诉|调查|加息|plunge|drop|fall|crash|slump|bear|outflow|sell|hack|exploit|liquidat|lawsuit|sue|probe|rate hike/i;
 function findItems(o,d=0){if(!o||d>4)return null;if(Array.isArray(o)&&o.length&&typeof o[0]==='object'&&('title' in o[0]))return o;if(typeof o==='object')for(const k in o){const r=findItems(o[k],d+1);if(r)return r}return null}
 async function loadNews(){
-  const srcs=[['律动 BlockBeats','https://api.theblockbeats.news/v1/open-api/open-flash?size=20&page=1&type=push&lang=cn'],['CryptoCompare','https://min-api.cryptocompare.com/data/v2/news/?lang=EN']];
-  for(const [name,url] of srcs){try{const d=await getJSON(url,8000),arr=findItems(d);if(!arr||!arr.length)continue;
-    const items=arr.slice(0,25).map(x=>{const raw=x.create_time??x.published_on??x.add_time??x.time,t=raw?(+raw<1e12?+raw*1000:+raw):Date.parse(x.published_at||x.date||'');const txt=(x.title||'')+' '+(x.content||x.body||'').slice(0,200).replace(/<[^>]+>/g,'');
+  let local=null;try{local=await getJSON('data/news.json?'+Math.floor(Date.now()/6e5),8000)}catch(e){}
+  const srcs=[...(local&&local.items&&local.items.length?[[local.src||'新闻',null,local]]:[]),['律动 BlockBeats','https://api.theblockbeats.news/v1/open-api/open-flash?size=20&page=1&type=push&lang=cn'],['CryptoCompare','https://min-api.cryptocompare.com/data/v2/news/?lang=EN']];
+  for(const [name,url,pre] of srcs){try{const d=pre||await getJSON(url,8000),arr=findItems(d);if(!arr||!arr.length)continue;
+    const items=arr.slice(0,25).map(x=>{const raw=x.create_time??x.published_on??x.add_time??x.time??x.t,t=raw?(+raw<1e12?+raw*1000:+raw):Date.parse(x.published_at||x.date||'');const txt=(x.title||'')+' '+(x.content||x.body||'').slice(0,200).replace(/<[^>]+>/g,'');
       const b=BULL.test(txt),r=BEAR.test(txt);return{title:(x.title||'').replace(/<[^>]+>/g,''),url:x.link||x.url||'',t,tag:b&&!r?'多':r&&!b?'空':'中'}});
     const n={多:0,空:0,中:0};items.forEach(x=>n[x.tag]++);
     $('#newsSrc').textContent=name;
