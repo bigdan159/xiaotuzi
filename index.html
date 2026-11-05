@@ -149,6 +149,23 @@ button{cursor:pointer}
 .npill{display:flex;gap:8px} .npill div{flex:1;text-align:center;border-radius:12px;padding:8px 0;font-weight:800}
 .nitem{display:grid;grid-template-columns:auto 1fr;gap:8px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;line-height:1.5}
 .nitem:last-child{border-bottom:0} .nitem a{color:var(--ink);text-decoration:none} .nitem small{color:var(--ink-2)}
+:root{--p5c:rgba(169,138,240,.22);--p20c:rgba(169,138,240,.45);--p50c:rgba(109,79,224,.8);--reach:rgba(227,169,47,.38)}
+.imp{background:var(--surface-2);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.imp .hd{display:flex;align-items:center;font-weight:800} .imp .hd .pill{margin-left:auto}
+.imp .kv{display:flex;justify-content:space-between;font-size:13px;color:var(--ink-2)} .imp .kv b{color:var(--ink);font-family:var(--f-num)}
+.sr{display:grid;grid-template-columns:auto 1fr auto auto;gap:10px;align-items:center;padding:9px 12px;background:var(--surface-2);font-size:14px}
+.sr:first-child{border-radius:12px 12px 0 0;border-bottom:1px solid var(--line)} .sr:last-child{border-radius:0 0 12px 12px}
+.ruler{background:var(--surface-2);border-radius:14px;padding:10px 12px}
+.ruler .top{display:flex;justify-content:space-between;font-size:13px;font-weight:700;margin-bottom:8px}
+.ruler .top span{color:var(--ink-2);font-weight:600}
+.track{position:relative;height:22px;border-radius:11px;background:var(--line);overflow:hidden}
+.track div{position:absolute;top:0;bottom:0}
+.track .bx{border:2px solid var(--pink);border-radius:6px;background:transparent}
+.track .now{width:3px;background:var(--ink);top:-2px;bottom:-2px}
+.rscale{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-3);margin-top:4px;font-family:var(--f-num)}
+.rlegend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;color:var(--ink-2);margin:10px 0 4px}
+.rlegend i{display:inline-block;width:12px;height:8px;border-radius:3px;margin-right:4px;vertical-align:middle}
+.rlegend i.bx{border:2px solid var(--pink);background:transparent}
 .verdictline{font-size:14px;line-height:1.6;padding:10px 12px;border-radius:12px;background:var(--accent-soft)}
 .paper{font-size:11px;color:var(--warn);background:var(--warn-soft);border-radius:5px;padding:1px 5px;font-weight:600}
 .posbox{border:1.5px solid var(--violet);background:linear-gradient(180deg,var(--accent-soft),var(--surface))}
@@ -269,7 +286,19 @@ a{color:var(--accent)}
     <div class="card">
       <h2 class="h2">拿单窗口 <span class="label" id="holdLbl"></span></h2>
       <div class="ladder" id="ladder" style="margin-top:6px"></div>
-      <div class="note" style="margin-top:8px">P50 = 过去 30 天里，持有同样时长后 50% 的收盘落在这个区间；P20 线外侧各只有约 10% 的情况。它们来自历史分布，不是均线。</div>
+      <div class="note" style="margin-top:8px">P50 = 过去 30 天里，持有同样时长后 50% 的收盘落在这个区间；P20 线外侧各只有约 10% 的情况，P5 线外侧各只有约 2.5%。它们来自历史分布，不是均线。</div>
+    </div>
+    <div class="card">
+      <h2 class="h2">推价 / 冲击 <span class="label" style="margin-left:auto">微观动量 · 只看</span></h2>
+      <div class="grid2" id="impulse" style="margin-top:10px"></div>
+      <div class="note" style="margin-top:8px">动量 = 最近一段涨跌了几个 ATR；衰竭 = 还在同方向，但最近几根明显走不动了。量比 = 最新一根成交量是前 20 根平均的几倍。急涨急跌刚发生、动量衰竭时，最容易追在尾巴上。</div>
+    </div>
+    <div class="card">
+      <h2 class="h2">点位尺 · 结构位 <span class="label" style="margin-left:auto">只看 · 不参与开平仓</span></h2>
+      <div id="struct" style="margin-top:10px"></div>
+      <div id="rulers" style="margin-top:6px;display:flex;flex-direction:column;gap:10px"></div>
+      <div class="rlegend"><span><i style="background:var(--p5c)"></i>P5</span><span><i style="background:var(--p20c)"></i>P20</span><span><i style="background:var(--p50c)"></i>P50</span><span><i class="bx"></i>布林带</span><span><i style="background:var(--reach)"></i>实际到过</span><span><i style="background:var(--ink);width:3px"></i>现价</span></div>
+      <div class="note">区间是「会走到这里的可能性」，上下冲到不代表方向。出界 = 按过去 30 天，同样时长内价格碰到 P20 线外的比例。</div>
     </div>
     <div class="card">
       <h2 class="h2">交易计划</h2>
@@ -367,7 +396,7 @@ a{color:var(--accent)}
       </ol>
     </div>
     <div class="card">
-      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-04 · 第 17 版</span></h2>
+      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-05 · 第 18 版</span></h2>
       <div class="btnrow" style="margin-top:10px"><button class="btn danger" id="bReset" style="grid-column:1/-1">重置纸面账户</button></div>
     </div>
   </section>
@@ -388,8 +417,8 @@ const $=s=>document.querySelector(s);
 let API='https://fapi.binance.com',PFX='/fapi/v1';
 const ROUTES=[['fapi','https://fapi.binance.com','/fapi/v1','wss://fstream.binance.com'],['spot','https://data-api.binance.vision','/api/v3','wss://data-stream.binance.vision'],['spot','https://api.binance.com','/api/v3','wss://stream.binance.com:9443'],['spot','https://api1.binance.com','/api/v3','wss://stream.binance.com:9443'],['spot','https://api3.binance.com','/api/v3','wss://stream.binance.com:9443']];
 let WSS='wss://fstream.binance.com';
-const TFS=[['1m','1分'],['5m','5分'],['15m','15分'],['1h','1小时'],['4h','4小时'],['1d','1天']];
-const TF_SEC={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400};
+const TFS=[['1m','1分'],['5m','5分'],['15m','15分'],['1h','1小时'],['4h','4小时'],['1d','1天'],['1w','1周'],['1M','1月']];
+const TF_SEC={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400,'1w':604800,'1M':2592000};
 const TZ=-new Date().getTimezoneOffset()*60;
 const VIEWS={overview:'总览',judge:'判断书',sentiment:'舆情',history:'K线走势与点位复盘',config:'配置'};
 const DEMO_BASE={ETHUSDT:2300,BTCUSDT:68000,SOLUSDT:160};
@@ -466,6 +495,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!S.live)c
 async function loadSymbol(){
   try{
     await Promise.all([klines(cfg.sym,cfg.tf),klines(cfg.sym,'4h',300),klines(cfg.sym,'1h',800),klines(cfg.sym,'15m',300)]);
+    Promise.all([klines(cfg.sym,'5m',150),klines(cfg.sym,'1m',150)]).then(()=>{S.toolsAt=0;renderTools()}).catch(()=>{});
     const k=S.kl[cfg.sym+cfg.tf];S.price=k[k.length-1].c;
     if(S.live){try{const t=await getJSON(`${API}${PFX}/ticker/24hr?symbol=${cfg.sym}`);S.chg=+t.priceChangePercent}catch(e){}}
     else{const d=S.kl[cfg.sym+'1h'];const p0=d[d.length-25].c;S.chg=(S.price/p0-1)*100}
@@ -545,7 +575,7 @@ function adx(k,n=14){let tr=0,pd=0,md=0,ad=0;
     if(i>=n){const a=100*pd/(tr||1),b=100*md/(tr||1),dx=100*Math.abs(a-b)/((a+b)||1);ad=i===n?dx:(ad*(n-1)+dx)/n}}
   return ad}
 function levelsOf(c1,p,H){const src=c1.slice(-720),rets=[];for(let i=0;i+H<src.length;i++)rets.push(src[i+H]/src[i]-1);
-  return{p50u:p*(1+quant(rets,.75)),p50d:p*(1+quant(rets,.25)),p20u:p*(1+quant(rets,.9)),p20d:p*(1+quant(rets,.1))}}
+  return{p50u:p*(1+quant(rets,.75)),p50d:p*(1+quant(rets,.25)),p20u:p*(1+quant(rets,.9)),p20d:p*(1+quant(rets,.1)),p5u:p*(1+quant(rets,.975)),p5d:p*(1+quant(rets,.025))}}
 function judgeRevert(k4,k1,k15,p,o={}){
   const items=[];let score=0,dir='WAIT';
   const c1=k1.map(x=>x.c),n1=c1.length-1,B=boll(c1)[n1],A=o.adx??adx(k1),R1=rsi(c1)[n1];
@@ -922,7 +952,7 @@ function updateChartLast(){
   if(Date.now()-lastFull>15000){lastFull=Date.now();const r=CH.main.timeScale().getVisibleLogicalRange();setChartData();if(r)CH.main.timeScale().setVisibleLogicalRange(r)}
 }
 function setPriceLines(){
-  if(!CH)return;CH.lines.forEach(l=>CH.candle.removePriceLine(l));CH.lines=[];
+  if(!CH)return;CH.lines.forEach(l=>CH.candle.removePriceLine(l));CH.lines=[];if(S.hideLines)return;
   const add=(price,color,title,style)=>{if(price!=null&&isFinite(price))CH.lines.push(CH.candle.createPriceLine({price,color,lineWidth:1,lineStyle:style,axisLabelVisible:true,title}))};
   const L=S.judge?.L;if(L){add(L.p50u,css('--p50'),'P50上',0);add(L.p50d,css('--p50'),'P50下',0);add(L.p20u,css('--p20'),'P20上',2);add(L.p20d,css('--p20'),'P20下',2)}
   const pos=acct.pos[cfg.sym];if(pos){add(pos.entry,css('--p50'),'开仓',1);add(pos.sl,css('--down'),'止损',2);add(pos.tp,css('--up'),pos.scale?'止盈1':'止盈',2);if(pos.scale&&!pos.tp1done)add(pos.tp2,css('--up'),'止盈2',2)}
@@ -932,7 +962,7 @@ function setMarkers(){
   const groups=[...Object.values(acct.pos),...acct.hist].filter(g=>g.sym===cfg.sym);const ms=[];
   groups.forEach(g=>g.fills.forEach(f=>{if(f.time<t0)return;const bt=Math.floor(f.time/step)*step;const buy=f.act==='买';
     ms.push({time:T(bt),position:buy?'belowBar':'aboveBar',color:buy?css('--up'):css('--down'),shape:buy?'arrowUp':'arrowDown',text:f.act})}));
-  ms.sort((a,b)=>a.time-b.time);CH.candle.setMarkers(ms);
+  ms.sort((a,b)=>a.time-b.time);CH.candle.setMarkers(S.hideLines?[]:ms);
 }
 
 /* ---------- sentiment ---------- */
@@ -1014,7 +1044,44 @@ function renderPosCards(){
   const hp=document.getElementById('histPos');if(hp)hp.innerHTML=pos?posCard(pos):'';
 }
 function pill(dir,go=true){if(!go&&dir!=='WAIT')return`<span class="pill wait">观望（${dir==='LONG'?'偏多':'偏空'}）</span>`;return`<span class="pill ${dir==='LONG'?'long':dir==='SHORT'?'short':'wait'}">${dir==='LONG'?'做多':dir==='SHORT'?'做空':'观望'}</span>`}
-function renderJudge(){
+function impulseOf(k,n){if(!k||k.length<n+25)return null;const m=k.length-1,A=atr(k.slice(-60))||1,c=k.map(x=>x.c);
+  const mom=(c[m]-c[m-n])/A,recent=(c[m]-c[m-3])/A,dir=mom>.3?'LONG':mom<-.3?'SHORT':'FLAT';
+  const avgV=k.slice(-21,-1).reduce((a,x)=>a+x.v,0)/20,vr=avgV?k[m].v/avgV:0;
+  const st=dir==='FLAT'?'平稳':Math.sign(recent)!==Math.sign(mom)||Math.abs(recent)<Math.abs(mom)*.15?'衰竭':Math.abs(recent)>Math.abs(mom)*.5?'加速':'延续';
+  return{dir,mom,st,vr}}
+function swingLv(k1,p){const hs=[],ls=[],w=3,K=k1.slice(-240);
+  for(let i=w;i<K.length-w;i++){const h=K[i].h,l=K[i].l;let ph=true,pl=true;for(let j=1;j<=w;j++){if(K[i-j].h>=h||K[i+j].h>h)ph=false;if(K[i-j].l<=l||K[i+j].l<l)pl=false}if(ph)hs.push(h);if(pl)ls.push(l)}
+  const up=hs.filter(h=>h>p*1.001).sort((a,b)=>a-b)[0],dn=ls.filter(l=>l<p*.999).sort((a,b)=>b-a)[0];
+  return{up:up??Math.max(...K.map(x=>x.h)),dn:dn??Math.min(...K.map(x=>x.l))}}
+function bandsOf(c,H){const src=c.slice(-721),r=[];for(let i=0;i+H<src.length;i++)r.push(src[i+H]/src[i]-1);if(r.length<30)return null;
+  const q=x=>quant(r,x);return{p5:[q(.025),q(.975)],p20:[q(.1),q(.9)],p50:[q(.25),q(.75)]}}
+function exitProb(k1,H){const K=k1.slice(-721),c=K.map(x=>x.c),r=[];for(let i=0;i+H<c.length;i++)r.push(c[i+H]/c[i]-1);if(r.length<30)return null;
+  const lo=quant(r,.1),hi=quant(r,.9);let out=0,n=0;
+  for(let i=0;i+H<K.length;i++){const b=c[i];let mx=-1e9,mn=1e9;for(let j=1;j<=H;j++){mx=Math.max(mx,K[i+j].h);mn=Math.min(mn,K[i+j].l)}n++;if(mx>=b*(1+hi)||mn<=b*(1+lo))out++}
+  return n?out/n:null}
+function renderTools(){
+  const now=Date.now();if(S.toolsAt&&now-S.toolsAt<5000)return;S.toolsAt=now;
+  const k1=S.kl[cfg.sym+'1h'],p=S.price;if(!k1||k1.length<60||!p)return;
+  const card=(t,x)=>{if(!x)return`<div class="imp"><div class="hd">${t}</div><div class="kv">数据加载中…</div></div>`;
+    const pl=x.dir==='LONG'?'<span class="pill long">多</span>':x.dir==='SHORT'?'<span class="pill short">空</span>':'<span class="pill wait">平</span>';
+    return`<div class="imp"><div class="hd">${t}${pl}</div><div class="kv"><span>动量</span><b class="${pc(x.mom)}">${x.mom>0?'+':''}${x.mom.toFixed(1)} ATR · ${x.st}</b></div><div class="kv"><span>量比</span><b>${x.vr.toFixed(1)}</b></div></div>`};
+  $('#impulse').innerHTML=card('5m 频段',impulseOf(S.kl[cfg.sym+'5m'],6))+card('1m 频段',impulseOf(S.kl[cfg.sym+'1m'],10));
+  const sw=swingLv(k1,p),pct=v=>((v/p-1)*100);
+  $('#struct').innerHTML=`<div class="sr"><span class="up">↑</span><span>压力位</span><b class="num">${fp(sw.up)}</b><span class="num up">+${pct(sw.up).toFixed(2)}%</span></div><div class="sr"><span class="down">↓</span><span>支撑位</span><b class="num">${fp(sw.dn)}</b><span class="num down">${pct(sw.dn).toFixed(2)}%</span></div>`;
+  const c1=k1.map(x=>x.c),n=k1.length-1,bb=boll(c1)[n];
+  const ruler=(title,H,past)=>{const B=bandsOf(c1,H);if(!B)return'';const base=past?c1[n-H]:p,lv=k=>B[k].map(r=>base*(1+r));
+    const reach=past?[Math.min(...k1.slice(-H).map(x=>x.l)),Math.max(...k1.slice(-H).map(x=>x.h))]:null;
+    const xs=[...lv('p5'),p,bb.u,bb.l,...(reach||[])],lo=Math.min(...xs),hi=Math.max(...xs),pad=(hi-lo)*.04,a=lo-pad,z=hi+pad,X=v=>((v-a)/(z-a)*100).toFixed(2);
+    const seg=(r,st)=>`<div style="left:${X(r[0])}%;width:${(X(r[1])-X(r[0])).toFixed(2)}%;${st}"></div>`;
+    const ep=past?null:exitProb(k1,H);
+    return`<div class="ruler"><div class="top">${title}<span class="num">${ep!=null?`不出 ${Math.round((1-ep)*100)}% · 出界 ${Math.round(ep*100)}% · `:''}${fp(p)}</span></div>
+      <div class="track">${seg(lv('p5'),'background:var(--p5c)')}${seg(lv('p20'),'background:var(--p20c)')}${seg(lv('p50'),'background:var(--p50c)')}${reach?seg(reach,'background:var(--reach)'):''}${seg([bb.l,bb.u],'').replace('<div ','<div class="bx" ')}<div class="now" style="left:calc(${X(p)}% - 1px)"></div></div>
+      <div class="rscale"><span>${fp(a)}</span><span>${fp(z)}</span></div>
+      ${past?'':`<div style="margin-top:6px;font-size:12.5px;display:grid;grid-template-columns:auto 1fr;gap:2px 10px">${['p5','p20','p50'].map(k=>`<span class="muted">${k.toUpperCase()}</span><span class="num" style="text-align:right">${fp(lv(k)[0])} ～ ${fp(lv(k)[1])}</span>`).join('')}</div>`}</div>`};
+  const H=Math.max(1,cfg.hold|0);
+  $('#rulers').innerHTML=ruler('20h 内的波动',20,true)+ruler('2h 内的波动',2,true)+ruler(`预计波动 · 1h 拿 ${H}h`,H,false);
+}
+function renderJudge(){renderTools();
   const j=S.judge;if(!j)return;
   $('#ovJudge').innerHTML=`<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">${pill(j.dir,j.go)}<span class="pill acc">评分 ${j.score}</span><span class="muted" style="font-size:13px">${j.summary}</span></div>
    <div class="note" style="margin-top:8px">${j.items.slice(0,2).map(i=>i.t).join('；')}</div>`;
@@ -1026,7 +1093,7 @@ function renderJudge(){
   $('#jTime').textContent=MODES[cfg.mode||'trend']+' · '+hhmm(j.at)+' 更新';
   const ic={ok:'✓',warn:'!',bad:'✕'};$('#reasons').innerHTML=j.items.map(i=>`<li><span class="ic ${i.s}">${ic[i.s]}</span><span>${i.t}</span></li>`).join('');
   $('#holdLbl').textContent=`持有 ${j.H} 小时`;
-  const L=j.L,rows=[['P20上',L.p20u,'--p20'],['P50上',L.p50u,'--p50'],['现价',S.price,'--accent'],['P50下',L.p50d,'--p50'],['P20下',L.p20d,'--p20']];
+  const L=j.L,rows=[...(L.p5u?[['P5上',L.p5u,'--violet']]:[]),['P20上',L.p20u,'--p20'],['P50上',L.p50u,'--p50'],['现价',S.price,'--accent'],['P50下',L.p50d,'--p50'],['P20下',L.p20d,'--p20'],...(L.p5d?[['P5下',L.p5d,'--violet']]:[])];
   $('#ladder').innerHTML=rows.map(([n,v,c])=>{const pct=(v/S.price-1)*100;return`<div class="rung ${n==='现价'?'now':''}"><span>${n}</span><span class="bar" style="background:var(${c});opacity:${n==='现价'?1:.55};width:${Math.min(100,20+Math.abs(pct)*25)}%"></span><span class="num">${fp(v)} <span class="muted" style="font-size:11px">${n==='现价'?'':(pct>0?'+':'')+pct.toFixed(2)+'%'}</span></span></div>`}).join('');
   const P=j.plan,cell=(k,v,cl='')=>`<div class="stat"><span class="label">${k}</span><b class="${cl}" style="font-size:15px">${v}</b></div>`;
   $('#plan').innerHTML=P?(cfg.scale?cell('止损',fp(P.sl),'down')+cell('止盈1 平一半',fp(P.tp),'up')+cell('止盈2',fp(P.tp2),'up'):cell('入场',fp(P.entry))+cell('止损',fp(P.sl),'down')+cell('止盈',fp(P.tp),'up'))+cell('盈亏比',P.rr.toFixed(2)):`<div class="empty" style="grid-column:1/-1">观望时不给计划，等方向一致再说</div>`;
@@ -1098,8 +1165,8 @@ function renderBacktest(){
 function show(v){cfg.view=v;saveCfg();document.querySelectorAll('.view').forEach(e=>e.classList.toggle('on',e.id==='v-'+v));document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));$('#viewTitle').textContent=VIEWS[v];window.scrollTo(0,0)}
 document.querySelectorAll('#tabs button').forEach(b=>b.onclick=()=>show(b.dataset.v));
 document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>show(b.dataset.go));
-$('#tfs').innerHTML=TFS.map(([k,n])=>`<button data-tf="${k}" class="${k===cfg.tf?'on':''}">${n}</button>`).join('');
-$('#tfs').onclick=async e=>{const b=e.target.closest('button');if(!b)return;cfg.tf=b.dataset.tf;saveCfg();document.querySelectorAll('#tfs button').forEach(x=>x.classList.toggle('on',x===b));
+$('#tfs').innerHTML=TFS.map(([k,n])=>`<button data-tf="${k}" class="${k===cfg.tf?'on':''}">${n}</button>`).join('')+`<button id="bEye" aria-label="隐藏或显示点位线" title="隐藏/显示点位线">${S.hideLines?'显示点位':'隐藏点位'}</button>`;
+$('#tfs').onclick=async e=>{const b=e.target.closest('button');if(!b)return;if(b.id==='bEye'){S.hideLines=!S.hideLines;b.textContent=S.hideLines?'显示点位':'隐藏点位';b.classList.toggle('on',S.hideLines);setPriceLines();setMarkers();return}cfg.tf=b.dataset.tf;saveCfg();document.querySelectorAll('#tfs button[data-tf]').forEach(x=>x.classList.toggle('on',x===b));
   try{await klines(cfg.sym,cfg.tf)}catch(err){toast('K 线加载失败')}setChartData();openStream()};
 $('#sym').value=cfg.sym;$('#sym').onchange=e=>{cfg.sym=e.target.value;saveCfg();loadSymbol()};
 $('#bFollow').onclick=()=>{const j=S.judge;if(j&&j.go)openPos(j.dir,'判断书趋势 '+j.dir+'（手动确认）：'+j.items.filter(x=>x.s!=='bad').map(x=>x.t).join('；'),j.plan)};
@@ -1130,13 +1197,13 @@ try{const ios=/iPhone|iPad|iPod/.test(navigator.userAgent),standalone=navigator.
 $('#tipX').onclick=()=>{$('#installTip').hidden=true;sset('tipClosed',true)};
 
 /* ---------- update check ---------- */
-const MYVER=17;
+const MYVER=18;
 async function checkUpdate(){try{const r=await fetch('index.html?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const m=(await r.text()).match(/第 (\d+) 版/);
   if(m&&+m[1]>MYVER){$('#updTxt').textContent=`有新版本（第 ${m[1]} 版），点这里更新`;$('#updTip').hidden=false;$('#updTip').onclick=()=>location.replace(location.pathname+'?v='+m[1])}}catch(e){}}
 if(location.protocol.startsWith('http')){setTimeout(checkUpdate,8000);setInterval(checkUpdate,5*60e3);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()})}
 
 /* ---------- loops ---------- */
-setInterval(async()=>{try{if(S.live)await Promise.all([klines(cfg.sym,'4h',300),klines(cfg.sym,'1h',800),klines(cfg.sym,'15m',300)]);runJudge();autoTrade();renderJudge();setPriceLines()}catch(e){}},60000);
+setInterval(async()=>{try{if(S.live)await Promise.all([klines(cfg.sym,'4h',300),klines(cfg.sym,'1h',800),klines(cfg.sym,'15m',300),klines(cfg.sym,'5m',150),klines(cfg.sym,'1m',150)]);S.toolsAt=0;runJudge();autoTrade();renderJudge();setPriceLines()}catch(e){}},60000);
 setInterval(()=>loadSenti(),300000);
 
 show(cfg.view);
