@@ -396,7 +396,7 @@ a{color:var(--accent)}
       </ol>
     </div>
     <div class="card">
-      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-05 · 第 18 版</span></h2>
+      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-06 · 第 19 版</span></h2>
       <div class="btnrow" style="margin-top:10px"><button class="btn danger" id="bReset" style="grid-column:1/-1">重置纸面账户</button></div>
     </div>
   </section>
@@ -729,7 +729,7 @@ function renderLog(){
   const el=document.getElementById('ovLog');if(!el)return;const now=Date.now(),L=sget('runlog_'+cfg.sym,[]).filter(x=>now-x[0]<864e5);
   if(!L.length){el.innerHTML=`<div class="empty">${cfg.auto?'还没有记录。自动跟单开着时，判断书每分钟检查一次，会记在这里。':'这台手机关闭了自动跟单，所以没有记录。'}</div>`;return}
   const wait=L.filter(x=>x[1]==='WAIT').length,low=L.filter(x=>x[1]!=='WAIT'&&!x[3]).length,flt=L.filter(x=>x[3]&&!x[4]),go=L.filter(x=>x[4]).length;
-  const mx=L.reduce((a,x)=>x[2]>a[2]?x:a,L[0]),span=(now-L[0][0])/36e5,exp=Math.round(span*60);
+  const mx=L.reduce((a,x)=>x[2]>a[2]?x:a,L[0]),span=(now-L[0][0])/36e5,exp=Math.max(1,Math.round(cfg.hourly?span:span*60));
   const cat=x=>x[4]?'go':x[3]?'f'+x[5]:x[1]==='WAIT'?'w':'low'+x[1];
   const txt=(x,m)=>x[4]?'达到开仓条件':x[3]?(x[5]==='rr'?`达到开仓线，但盈亏比 ${x[7]} 不够`:'达到开仓线，但在止损冷却中'):x[1]==='WAIT'?'观望':`${dirTxt[x[1]]}，最高评分 ${m} 没到 ${cfg.minScore}`;
   const ch=[];for(const x of L){const c=cat(x);if(!ch.length||ch[ch.length-1].c!==c)ch.push({c,t:x[0],r:x[6],x,m:x[2]});else{const l=ch[ch.length-1];l.m=Math.max(l.m,x[2]);l.r=x[6]}}
@@ -1197,7 +1197,7 @@ try{const ios=/iPhone|iPad|iPod/.test(navigator.userAgent),standalone=navigator.
 $('#tipX').onclick=()=>{$('#installTip').hidden=true;sset('tipClosed',true)};
 
 /* ---------- update check ---------- */
-const MYVER=18;
+const MYVER=19;
 async function checkUpdate(){try{const r=await fetch('index.html?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const m=(await r.text()).match(/第 (\d+) 版/);
   if(m&&+m[1]>MYVER){$('#updTxt').textContent=`有新版本（第 ${m[1]} 版），点这里更新`;$('#updTip').hidden=false;$('#updTip').onclick=()=>location.replace(location.pathname+'?v='+m[1])}}catch(e){}}
 if(location.protocol.startsWith('http')){setTimeout(checkUpdate,8000);setInterval(checkUpdate,5*60e3);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()})}
