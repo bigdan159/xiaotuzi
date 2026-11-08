@@ -254,6 +254,7 @@ a{color:var(--accent)}
         <div class="stat"><span class="label">胜率</span><b id="winRate">—</b></div>
         <div class="stat"><span class="label">已平笔数</span><b id="nTrades">—</b></div>
       </div>
+      <div class="note" id="rStat" style="margin-top:8px"></div>
     </div>
     <div class="card">
       <h2 class="h2">当前持仓 <button class="more" data-go="history">去复盘 ›</button></h2>
@@ -266,6 +267,11 @@ a{color:var(--accent)}
     <div class="card">
       <h2 class="h2">自动跟单运行记录 <span class="label" style="margin-left:auto">最近 24 小时</span></h2>
       <div id="ovLog" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <h2 class="h2">影子判断 · 过关进度 <span class="label" style="margin-left:auto">只记录 · 不开单</span></h2>
+      <div id="shadow" style="margin-top:8px"></div>
+      <div class="note">其他策略按同样的实时行情在后台跑纸面，只记录不开单，用 R 和线上比。过关条件：至少 20 笔、每周都不比线上差、满两周、下限大于 0、总成绩比线上好。影子单按一次进出、固定止损止盈算，不含加仓、分批和移动止损。过关了才考虑换上线。</div>
     </div>
   </section>
 
@@ -397,7 +403,7 @@ a{color:var(--accent)}
       </ol>
     </div>
     <div class="card">
-      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-08 · 第 20 版</span></h2>
+      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-08 · 第 21 版</span></h2>
       <div class="btnrow" style="margin-top:10px"><button class="btn danger" id="bReset" style="grid-column:1/-1">重置纸面账户</button></div>
     </div>
   </section>
@@ -528,7 +534,7 @@ function openStream(){
 let rT=0;
 function onPrice(p,v,fromWs){
   S.price=p;if(!fromWs)applyTick(cfg.sym,p,v);
-  checkStops();
+  checkStops();shadowStops(cfg.sym,p);
   updateChartLast();
   const now=Date.now();if(now-rT>500){rT=now;renderTicker();renderEquity();renderPosCards();if(cfg.view==='judge')renderJudge()}
 }
@@ -747,7 +753,51 @@ function renderLog(){
 function closedJudge(sym=cfg.sym){const now=Date.now(),f=(k,ms)=>(k||[]).filter(x=>x.t+ms<=now);
   const k4=f(S.kl[sym+'4h'],144e5),k1=f(S.kl[sym+'1h'],36e5),k15=f(S.kl[sym+'15m'],9e5);
   if(k4.length<60||k1.length<100||k15.length<60)return null;return{...judgeCore(k4,k1,k15,k15[k15.length-1].c),at:now}}
-function autoTrade(){if(!cfg.auto||!S.live)return;for(const sym of watchList())try{autoTradeSym(sym)}catch(e){}}
+function autoTrade(){if(!cfg.auto||!S.live)return;for(const sym of watchList()){try{autoTradeSym(sym)}catch(e){}try{shadowTick(sym)}catch(e){}}}
+/* ---------- 影子判断 ---------- */
+const SHMODES=['trend','revert','trend4h','swing','rally','copy','auto'];
+let SH=null;
+function shKey(){return 'shadow_'+(S.live?'live':'demo')}
+function loadSH(){SH=Object.assign({start:Date.now(),pos:{},hist:[],stop:{}},sget(shKey(),{}))}
+function saveSH(){sset(shKey(),SH)}
+function shR(pos,exit){const risk=Math.abs(pos.entry-pos.sl)||1,g=pos.side==='LONG'?exit-pos.entry:pos.entry-exit;return g/risk-2*feeRate()*pos.entry/risk}
+function shClose(key,exit,note){const pos=SH.pos[key];if(!pos)return;const r=shR(pos,exit),now=Date.now();
+  SH.hist.push({mode:pos.mode,sym:pos.sym,side:pos.side,entry:pos.entry,exit,r,open:pos.open,closed:now,note});
+  if(note==='止损'){(SH.stop[key]=SH.stop[key]||{})[pos.side]=now}
+  if(SH.hist.length>2000)SH.hist.splice(0,SH.hist.length-2000);delete SH.pos[key]}
+function shadowTick(sym){if(!SH)loadSH();S.shHour=S.shHour||{};
+  let k4=S.kl[sym+'4h'],k1=S.kl[sym+'1h'],k15=S.kl[sym+'15m'],price=pxOf(sym);if(!k4||!k1||!k15||!price)return;
+  if(cfg.hourly){const now=Date.now(),h=Math.floor(now/36e5);if(S.shHour[sym]===h||now%36e5>5*60e3)return;
+    const f=(k,ms)=>k.filter(x=>x.t+ms<=now);k4=f(k4,144e5);k1=f(k1,36e5);k15=f(k15,9e5);if(k15.length<60)return;price=k15[k15.length-1].c;S.shHour[sym]=h}
+  for(const mode of SHMODES){if(mode===cfg.mode)continue;const key=mode+'|'+sym;let j;try{j=judgeCore(k4,k1,k15,price,{mode})}catch(e){continue}
+    const pos=SH.pos[key],ok=j.go&&j.plan&&passFilter(j.dir,j.plan,Date.now(),SH.stop[key],cfg);
+    if(pos&&((ok&&j.dir!==pos.side)||(pos.flip&&j.dir!==pos.side)))shClose(key,pxOf(sym),ok?'反向信号':'判断书不再支持');
+    if(!SH.pos[key]&&ok){const sl=j.plan.sl,tp=j.plan.tp;if((j.dir==='SHORT'&&sl>price&&tp<price)||(j.dir==='LONG'&&sl<price&&tp>price))
+      SH.pos[key]={mode,sym,side:j.dir,entry:price,sl,tp,flip:!!j.plan.flip,maxH:j.plan.maxH||0,open:Date.now()}}}
+  saveSH();renderShadow()}
+function shadowStops(sym,p){if(!SH||!p)return;let ch=false;
+  for(const key of Object.keys(SH.pos)){const pos=SH.pos[key];if(pos.sym!==sym)continue;const sh=pos.side==='SHORT';
+    if(sh?p>=pos.sl:p<=pos.sl){shClose(key,p,'止损');ch=true}else if(sh?p<=pos.tp:p>=pos.tp){shClose(key,p,'止盈');ch=true}
+    else if(pos.maxH&&Date.now()-pos.open>pos.maxH*36e5){shClose(key,p,'超时');ch=true}}
+  if(ch){saveSH();renderShadow()}}
+const wk=t=>Math.floor((t-4*864e5)/(7*864e5));
+function shStats(list){const n=list.length,tot=list.reduce((a,x)=>a+x.r,0),w=list.filter(x=>x.r>0).length;
+  let lb=null;if(n>=2){const m=tot/n,sd=Math.sqrt(list.reduce((a,x)=>a+(x.r-m)**2,0)/(n-1));lb=n*(m-1.64*sd/Math.sqrt(n))}
+  return{n,tot,wr:n?w/n*100:0,lb}}
+function renderShadow(){const el=document.getElementById('shadow');if(!el)return;if(!SH)loadSH();
+  const live=acct.hist.filter(h=>h.r!=null&&h.closed>=SH.start),L=shStats(live.map(h=>({r:h.r}))),w0=wk(SH.start),w1=wk(Date.now());
+  const liveW={};live.forEach(h=>{const k=wk(h.closed);liveW[k]=(liveW[k]||0)+h.r});
+  const days=((Date.now()-SH.start)/864e5).toFixed(1),open=Object.keys(SH.pos).length;
+  const rs=v=>`${v>0?'+':''}${v.toFixed(1)}R`;
+  const rows=SHMODES.filter(m=>m!==cfg.mode).map(m=>{const list=SH.hist.filter(x=>x.mode===m),st=shStats(list),diff=st.tot-L.tot;
+    const sW={};list.forEach(x=>{const k=wk(x.closed);sW[k]=(sW[k]||0)+x.r});let nw=0,ok=0;for(let k=w0;k<=w1;k++){nw++;if((sW[k]||0)>=(liveW[k]||0))ok++}
+    const why=st.n<20?`笔数还不够（${st.n}/20）`:ok<nw?`有 ${nw-ok} 周比线上差`:nw<2?'还不满两周':!(st.lb>0)?'下限还没到 0':diff<=0?'没比线上好':'';
+    return{m,st,diff,nw,ok,why,pass:!why}}).sort((a,b)=>b.diff-a.diff);
+  el.innerHTML=`<div class="btrow" style="grid-template-columns:1fr auto"><span><b>线上：${MODES[cfg.mode]}</b><br><span class="muted" style="font-size:12px">${L.n} 笔 · 胜 ${L.n?L.wr.toFixed(0):'—'}%</span></span><b class="num ${pc(L.tot)}">${rs(L.tot)}</b></div>
+   ${rows.map(x=>`<div class="btrow" style="grid-template-columns:1fr auto auto;gap:10px"><span><b>${MODES[x.m]}</b><br><span class="muted" style="font-size:12px">${x.st.n} 笔 · 胜 ${x.st.n?x.st.wr.toFixed(0):'—'}% · ${x.ok}/${x.nw} 周不差 · ${x.why||'达标'}</span></span>
+     <span class="num" style="text-align:right"><b class="${pc(x.st.tot)}">${rs(x.st.tot)}</b><br><span style="font-size:12px" class="${pc(x.diff)}">比线上 ${rs(x.diff)}</span><br><span class="muted" style="font-size:11px">下限 ${x.st.lb==null?'—':rs(x.st.lb)}</span></span>
+     <span class="pill ${x.pass?'long':'wait'}">${x.pass?'过关':'未过'}</span></div>`).join('')}
+   <div class="note" style="margin-top:8px">已跑 ${days} 天 · 影子持仓中 ${open} 笔 · 盯 ${watchList().map(base).join(' / ')}</div>`}
 function autoTradeSym(sym){
   S.lastHourBy=S.lastHourBy||{};S.lastAutoBy=S.lastAutoBy||{};
   let j;const pos=acct.pos[sym];
@@ -769,7 +819,7 @@ function openPos(side,note,plan,sym=cfg.sym){
     sl=P.sl;tp=P.tp;tp2=P.tp2}
   const now=Date.now();
   const pos={id:now,sym,side,qty,qty0:qty,entry:p,sl,tp,tp2,sw,adds:sw?[...plan.adds]:null,tpd:sw?plan.tpd:null,maxH:sw?plan.maxH:null,n0:cfg.notional/3,flip:!!(plan&&plan.flip),scale:!!cfg.scale&&!sw&&!(plan&&plan.flip),tp1done:false,open:now,trailed:false,fills:[{kind:'open',act:side==='LONG'?'买':'卖',qty,price:p,notional,fee,pnl:-fee,time:now,note}]};
-  acct.pos[sym]=pos;acct.balance-=fee;saveAcct();renderAll();toast(`纸面开${side==='LONG'?'多':'空'} ${qty} ${base(sym)} @ ${fps(p,sym)}`);
+  if(sl!=null)pos.risk=sw?cfg.notional*Math.abs(p-sl)/p:qty*Math.abs(p-sl);acct.pos[sym]=pos;acct.balance-=fee;saveAcct();renderAll();toast(`纸面开${side==='LONG'?'多':'空'} ${qty} ${base(sym)} @ ${fps(p,sym)}`);
 }
 function reducePos(sym,frac,note){
   const pos=acct.pos[sym];if(!pos)return;const p=pxOf(sym),q=+(pos.qty*frac).toFixed(4);if(q<=0||q>=pos.qty)return closePos(sym,note);
@@ -787,7 +837,7 @@ function closePos(sym,note){
   const pos=acct.pos[sym];if(!pos)return;const p=pxOf(sym);if(!p)return;const notional=pos.qty*p,fee=notional*feeRate();
   const gross=(pos.side==='LONG'?p-pos.entry:pos.entry-p)*pos.qty,now=Date.now();
   pos.fills.push({kind:'close',act:pos.side==='LONG'?'卖':'买',qty:pos.qty,price:p,notional,fee,pnl:gross-fee,time:now,note});
-  acct.balance+=gross-fee;pos.closed=now;pos.realized=pos.fills.reduce((a,f)=>a+f.pnl,0);
+  acct.balance+=gross-fee;pos.closed=now;pos.realized=pos.fills.reduce((a,f)=>a+f.pnl,0);if(pos.risk)pos.r=pos.realized/pos.risk;
   if(/止损/.test(note)&&!/保本|移动/.test(note)){acct.lastStop=acct.lastStop||{};(acct.lastStop[sym]=acct.lastStop[sym]||{})[pos.side]=now}
   acct.hist.unshift(pos);delete acct.pos[sym];if(acct.hist.length>300)acct.hist.length=300;saveAcct();renderAll();
   toast(`${base(sym)} ${note}：${sg(gross-fee)} USDT`);
@@ -1033,7 +1083,10 @@ function renderTicker(){$('#price').textContent=fp(S.price);const c=$('#chg');c.
 function spark(vals,w,h,color,fill=true){if(!vals||vals.length<2)return'';const mn=Math.min(...vals),mx=Math.max(...vals),r=mx-mn||1;
   const pts=vals.map((v,i)=>[i/(vals.length-1)*w,h-4-(v-mn)/r*(h-10)]);const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join('');const e=pts[pts.length-1];
   return(fill?`<path d="${d}L${w} ${h}L0 ${h}Z" fill="${color}" fill-opacity=".12"/>`:'')+`<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><circle cx="${e[0]}" cy="${e[1]}" r="3" fill="${color}"/>`}
-function renderEquity(){
+function renderRStat(){const el=document.getElementById('rStat');if(!el)return;const t=acct.hist.filter(h=>h.r!=null);
+  if(!t.length){el.textContent='R = 一单止损时会亏的钱。赚 2R 就是赚了止损额的两倍，用它比较成绩不受仓位大小影响。';return}
+  const tot=t.reduce((a,h)=>a+h.r,0);el.innerHTML=`按 R 算：累计 <b class="${pc(tot)}">${tot>0?'+':''}${tot.toFixed(2)}R</b> · 平均每笔 <b class="${pc(tot)}">${(tot/t.length>0?'+':'')+(tot/t.length).toFixed(2)}R</b>（${t.length} 笔）`}
+function renderEquity(){renderRStat();
   const fl=Object.values(acct.pos).reduce((a,p)=>a+floatPnl(p),0);
   $('#equity').textContent=fmt(acct.balance+fl,2);
   const closed=[...acct.hist].reverse();let run=cfg.start;const curve=[cfg.start,...closed.map(h=>run+=h.realized)];curve.push(acct.balance+fl);
@@ -1113,7 +1166,7 @@ function renderHistory(){
   const groups=[...acct.hist];let html='<div id="histPos"></div>';
   const pos=acct.pos[cfg.sym];
   const block=(g,open)=>{const fees=g.fills.reduce((a,f)=>a+f.fee,0),real=g.fills.reduce((a,f)=>a+(f.kind==='close'||f.kind==='reduce'?f.pnl:-f.fee),0);
-    return`<div class="day"><span class="d">${dayLabel(g.open)}</span><span class="num">${hhmm(g.open)} 开仓</span><span class="pill ${g.side==='LONG'?'long':'short'}">${g.side==='LONG'?'多':'空'}</span><span style="color:${open?'var(--p20)':'var(--ink-2)'};font-size:13px">${open?'持仓中':'已平完'}</span><span class="r ${pc(real)}">已实现 ${sg(real)}</span></div>
+    return`<div class="day"><span class="d">${dayLabel(g.open)}</span><span class="num">${hhmm(g.open)} 开仓</span><span class="pill ${g.side==='LONG'?'long':'short'}">${g.side==='LONG'?'多':'空'}</span><span style="color:${open?'var(--p20)':'var(--ink-2)'};font-size:13px">${open?'持仓中':'已平完'}</span><span class="r ${pc(real)}">已实现 ${sg(real)}${!open&&g.r!=null?` · ${g.r>0?'+':''}${g.r.toFixed(2)}R`:''}</span></div>
     <div class="muted" style="font-size:13px;margin-top:-6px">这一笔共 ${g.fills.length} 次成交 · 手续费 ${fmt(fees,2)}${g.demo?' · 示例数据':''}</div>
     ${[...g.fills].reverse().map(f=>`<div class="fill"><div class="l1">${base(g.sym)} <span class="kind-${f.kind}">${{open:'开仓',close:'平仓',reduce:'减仓',add:'加仓'}[f.kind]}</span><span class="${f.act==='买'?'up':'down'}">${f.act}</span><span class="paper">纸面</span><span class="t">${hms(f.time)}</span></div>
     <div class="l2"><span class="v">${f.qty} @ ${fps(f.price,g.sym)}</span>· 名义 ${fmt(f.notional,2)} · 费 ${fmt(f.fee,2)} · <b class="${pc(f.pnl)}" style="font-size:15px">${sg(f.pnl)}</b></div><div class="l3">${f.note}</div></div>`).join('')}`};
@@ -1147,7 +1200,7 @@ function renderSenti(){
   if(d.demo)R.push({s:'warn',t:'以上是演示数据，部署到能访问币安的网址后会换成真实数据'});
   $('#sentiRead').innerHTML=R.map(i=>`<li><span class="ic ${i.s}">${i.s==='ok'?'✓':'!'}</span><span>${i.t}</span></li>`).join('');
 }
-function renderAll(){renderLog();renderTicker();renderEquity();renderJudge();renderHistory();setPriceLines();setMarkers();
+function renderAll(){renderLog();try{if(!SH||SH._k!==shKey()){loadSH();SH._k=shKey()}renderShadow()}catch(e){}renderTicker();renderEquity();renderJudge();renderHistory();setPriceLines();setMarkers();
   $('#tvLink').href=`https://www.tradingview.com/chart/?symbol=BINANCE:${cfg.sym}.P`}
 
 function renderBacktest(){
@@ -1192,7 +1245,7 @@ S.optSym=cfg.sym;const markOpt=()=>document.querySelectorAll('#optSym button').f
 $('#optSym').onclick=e=>{const b=e.target.closest('button');if(!b)return;S.optSym=b.dataset.s;markOpt()};
 $('#cMode').value=cfg.mode||'trend';$('#cMode').onchange=e=>{cfg.mode=e.target.value;saveCfg();runJudge();renderJudge();setPriceLines();renderOptimize();toast('已切换到'+MODES[cfg.mode])};
 let resetArm=0;$('#bReset').onclick=e=>{if(Date.now()-resetArm>4000){resetArm=Date.now();e.target.textContent='再点一次确认重置（清空纸面记录）';setTimeout(()=>e.target.textContent='重置纸面账户',4000);return}
-  acct={balance:cfg.start,pos:{},hist:[]};saveAcct();sset(acctKey()+'_seeded',true);e.target.textContent='重置纸面账户';renderAll();toast('纸面账户已重置')};
+  acct={balance:cfg.start,pos:{},hist:[]};saveAcct();sset(acctKey()+'_seeded',true);SH={start:Date.now(),pos:{},hist:[],stop:{}};saveSH();e.target.textContent='重置纸面账户';renderAll();toast('纸面账户已重置')};
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(CH){CH.main.applyOptions(chartTheme());CH.sub.applyOptions({...chartTheme(),layout:{...chartTheme().layout,attributionLogo:false},timeScale:{visible:false,borderVisible:false}});setChartData()}renderAll();renderSenti()});
 new MutationObserver(()=>{if(CH){CH.main.applyOptions(chartTheme());CH.sub.applyOptions({...chartTheme(),layout:{...chartTheme().layout,attributionLogo:false},timeScale:{visible:false,borderVisible:false}});setChartData()}renderAll();renderSenti()}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 
@@ -1206,13 +1259,13 @@ try{const ios=/iPhone|iPad|iPod/.test(navigator.userAgent),standalone=navigator.
 $('#tipX').onclick=()=>{$('#installTip').hidden=true;sset('tipClosed',true)};
 
 /* ---------- multi-symbol price poll ---------- */
-async function pollOthers(){if(!S.live)return;S.px=S.px||{};const others=[...new Set([...watchList(),...Object.keys(acct?acct.pos:{})])].filter(x=>x!==cfg.sym);
-  for(const sym of others){try{const r=await getJSON(`${API}${PFX}/ticker/price?symbol=${sym}`,6000);const p=+r.price;if(p>0){S.px[sym]=p;checkStopsSym(sym)}}catch(e){}}
+async function pollOthers(){if(!S.live)return;S.px=S.px||{};const others=[...new Set([...watchList(),...Object.keys(acct?acct.pos:{}),...(SH?Object.values(SH.pos).map(x=>x.sym):[])])].filter(x=>x!==cfg.sym);
+  for(const sym of others){try{const r=await getJSON(`${API}${PFX}/ticker/price?symbol=${sym}`,6000);const p=+r.price;if(p>0){S.px[sym]=p;checkStopsSym(sym);shadowStops(sym,p)}}catch(e){}}
   if(others.length){renderEquity();renderPosCards()}}
 setInterval(pollOthers,10000);
 
 /* ---------- update check ---------- */
-const MYVER=20;
+const MYVER=21;
 async function checkUpdate(){try{const r=await fetch('index.html?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const m=(await r.text()).match(/第 (\d+) 版/);
   if(m&&+m[1]>MYVER){$('#updTxt').textContent=`有新版本（第 ${m[1]} 版），点这里更新`;$('#updTip').hidden=false;$('#updTip').onclick=()=>location.replace(location.pathname+'?v='+m[1])}}catch(e){}}
 if(location.protocol.startsWith('http')){setTimeout(checkUpdate,8000);setInterval(checkUpdate,5*60e3);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()})}
