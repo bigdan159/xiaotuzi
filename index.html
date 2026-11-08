@@ -372,6 +372,7 @@ a{color:var(--accent)}
       <div class="field"><label for="cMin">最低开仓评分<small>判断书评分达到才开仓</small></label><input type="number" id="cMin" min="0" max="100" step="5"></div>
       <div class="field"><label for="cHold">持仓窗口（小时）<small>决定 P50 / P20 区间宽度</small></label><input type="number" id="cHold" min="1" max="48" step="1"></div>
       <div class="field"><label for="cAuto">自动跟判断书开平仓<small>每分钟检查一次，只在纸面执行</small></label><input type="checkbox" class="switch" id="cAuto"></div>
+      <div class="field"><label for="cMulti">同时盯 ETH 和 BTC<small>两个币各自按同样的规则判断、各自开单，纸面账户合在一起算</small></label><input type="checkbox" class="switch" id="cMulti"></div>
       <div class="field"><label for="cHourly">只在整点判断开仓<small>等 1 小时 K 线收盘后（整点 5 分钟内）才判断一次，不追没走完的急涨急跌；止盈止损照常实时盯</small></label><input type="checkbox" class="switch" id="cHourly"></div>
       <div class="field"><label for="cTpsl">自动止盈止损<small>止盈 P50 对侧，止损 P50 外侧</small></label><input type="checkbox" class="switch" id="cTpsl"></div>
       <div class="field"><label for="cTrail">移动止损<small>浮盈到目标一半时把止损挪过开仓价（不分批时生效）</small></label><input type="checkbox" class="switch" id="cTrail"></div>
@@ -396,7 +397,7 @@ a{color:var(--accent)}
       </ol>
     </div>
     <div class="card">
-      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-06 · 第 19 版</span></h2>
+      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-08 · 第 20 版</span></h2>
       <div class="btnrow" style="margin-top:10px"><button class="btn danger" id="bReset" style="grid-column:1/-1">重置纸面账户</button></div>
     </div>
   </section>
@@ -427,7 +428,7 @@ const DP={ETHUSDT:2,BTCUSDT:1,SOLUSDT:3};
 function sget(k,d){try{const v=localStorage.getItem('pj_'+k);return v?JSON.parse(v):d}catch(e){return d}}
 function sset(k,v){try{localStorage.setItem('pj_'+k,JSON.stringify(v))}catch(e){}}
 
-const cfg=Object.assign({sym:'ETHUSDT',tf:'1h',view:'overview',notional:400,lev:10,fee:0.05,start:1000,minScore:60,hold:4,auto:true,tpsl:true,trail:true,scale:true,cool:0,rrMin:0,rebate:0,mode:'trend',hourly:false},sget('cfg',{}));
+const cfg=Object.assign({sym:'ETHUSDT',tf:'1h',view:'overview',notional:400,lev:10,fee:0.05,start:1000,minScore:60,hold:4,auto:true,tpsl:true,trail:true,scale:true,cool:0,rrMin:0,rebate:0,mode:'trend',hourly:false,multi:true},sget('cfg',{}));
 const S={src:'demo',diag:[],live:false,kl:{},price:0,chg:0,judge:null,senti:null,ws:null,demoP:{...DEMO_BASE},lastAuto:0};
 let acct=null;
 function acctKey(){return 'acct_'+(S.live?'live':'demo')}
@@ -721,10 +722,10 @@ function passFilter(dir,plan,t,lastStop,o){
   if(o.cool&&lastStop&&lastStop[dir]&&t-lastStop[dir]<o.cool*36e5)return false;
   return true;
 }
-function logCheck(j,ok){try{
-  const L=sget('runlog_'+cfg.sym,[]),why=j.go&&!ok?(cfg.rrMin&&j.plan&&j.plan.rr<cfg.rrMin?'rr':'cool'):'';
+function logCheck(j,ok,sym=cfg.sym){try{
+  const L=sget('runlog_'+sym,[]),why=j.go&&!ok?(cfg.rrMin&&j.plan&&j.plan.rr<cfg.rrMin?'rr':'cool'):'';
   L.push([Date.now(),j.dir,j.score,j.go?1:0,ok?1:0,why,((j.items||[])[0]||{}).t||'',j.plan?+j.plan.rr.toFixed(2):0]);
-  while(L.length>3000)L.shift();sset('runlog_'+cfg.sym,L);renderLog()}catch(e){}}
+  while(L.length>3000)L.shift();sset('runlog_'+sym,L);renderLog()}catch(e){}}
 function renderLog(){
   const el=document.getElementById('ovLog');if(!el)return;const now=Date.now(),L=sget('runlog_'+cfg.sym,[]).filter(x=>now-x[0]<864e5);
   if(!L.length){el.innerHTML=`<div class="empty">${cfg.auto?'还没有记录。自动跟单开着时，判断书每分钟检查一次，会记在这里。':'这台手机关闭了自动跟单，所以没有记录。'}</div>`;return}
@@ -743,64 +744,69 @@ function renderLog(){
    <div class="label" style="margin:10px 0 4px">状态变化（最近 8 次，时间是这段状态开始的时候）</div>
    ${ch.slice(-8).reverse().map(c=>`<div class="btrow" style="grid-template-columns:auto 1fr"><span class="num muted">${hhmm(c.t)}</span><span>${c.k}<br><span class="muted" style="font-size:12px">${c.r}</span></span></div>`).join('')}`;
 }
-function closedJudge(){const now=Date.now(),f=(k,ms)=>k.filter(x=>x.t+ms<=now);
-  const k4=f(S.kl[cfg.sym+'4h'],144e5),k1=f(S.kl[cfg.sym+'1h'],36e5),k15=f(S.kl[cfg.sym+'15m'],9e5);
+function closedJudge(sym=cfg.sym){const now=Date.now(),f=(k,ms)=>(k||[]).filter(x=>x.t+ms<=now);
+  const k4=f(S.kl[sym+'4h'],144e5),k1=f(S.kl[sym+'1h'],36e5),k15=f(S.kl[sym+'15m'],9e5);
   if(k4.length<60||k1.length<100||k15.length<60)return null;return{...judgeCore(k4,k1,k15,k15[k15.length-1].c),at:now}}
-function autoTrade(){
-  if(!cfg.auto||!S.judge||!S.live)return;let j=S.judge;const pos=acct.pos[cfg.sym];
-  if(cfg.hourly){const now=Date.now(),h=Math.floor(now/36e5);if(S.lastHour===h||now%36e5>5*60e3)return;S.lastHour=h;const cj=closedJudge();if(!cj)return;j=cj}
-  const ok=j.go&&passFilter(j.dir,j.plan,Date.now(),(acct.lastStop||{})[cfg.sym],cfg);logCheck(j,ok);if(cfg.hourly)S.lastAuto=0;
-  if(pos&&ok&&j.dir!==pos.side){closePos(cfg.sym,'判断书反向信号');}
-  else if(pos&&pos.flip&&j.dir!==pos.side){closePos(cfg.sym,'判断书不再支持：'+(((j.items||[]).find(x=>x.s==='bad')||{}).t||'方向变了'))}
-  if(!acct.pos[cfg.sym]&&ok&&Date.now()-S.lastAuto>15*60e3){S.lastAuto=Date.now();openPos(j.dir,'判断书趋势 '+j.dir+'：'+j.items.filter(x=>x.s!=='bad').map(x=>x.t).join('；'),j.plan)}
+function autoTrade(){if(!cfg.auto||!S.live)return;for(const sym of watchList())try{autoTradeSym(sym)}catch(e){}}
+function autoTradeSym(sym){
+  S.lastHourBy=S.lastHourBy||{};S.lastAutoBy=S.lastAutoBy||{};
+  let j;const pos=acct.pos[sym];
+  if(cfg.hourly){const now=Date.now(),h=Math.floor(now/36e5);if(S.lastHourBy[sym]===h||now%36e5>5*60e3)return;const cj=closedJudge(sym);if(!cj)return;S.lastHourBy[sym]=h;j=cj;S.lastAutoBy[sym]=0}
+  else if(sym===cfg.sym){if(!S.judge)return;j=S.judge}
+  else{const k4=S.kl[sym+'4h'],k1=S.kl[sym+'1h'],k15=S.kl[sym+'15m'];if(!k4||!k1||!k15)return;j=judgeCore(k4,k1,k15,pxOf(sym))}
+  const ok=j.go&&passFilter(j.dir,j.plan,Date.now(),(acct.lastStop||{})[sym],cfg);logCheck(j,ok,sym);
+  if(pos&&ok&&j.dir!==pos.side){closePos(sym,'判断书反向信号');}
+  else if(pos&&pos.flip&&j.dir!==pos.side){closePos(sym,'判断书不再支持：'+(((j.items||[]).find(x=>x.s==='bad')||{}).t||'方向变了'))}
+  if(!acct.pos[sym]&&ok&&Date.now()-(S.lastAutoBy[sym]||0)>15*60e3){S.lastAutoBy[sym]=Date.now();openPos(j.dir,'判断书趋势 '+j.dir+'：'+j.items.filter(x=>x.s!=='bad').map(x=>x.t).join('；'),j.plan,sym)}
 }
 
 /* ---------- paper engine ---------- */
-function openPos(side,note,plan){
-  if(acct.pos[cfg.sym]){toast('已有持仓，先平仓');return}
-  const p=S.price,sw=!!(plan&&plan.adds&&cfg.tpsl),qty=+(cfg.notional/(sw?3:1)/p).toFixed(4),notional=qty*p,fee=notional*feeRate();
+function openPos(side,note,plan,sym=cfg.sym){
+  if(acct.pos[sym]){toast('已有持仓，先平仓');return}
+  const p=pxOf(sym);if(!p)return;const sw=!!(plan&&plan.adds&&cfg.tpsl),qty=+(cfg.notional/(sw?3:1)/p).toFixed(4),notional=qty*p,fee=notional*feeRate();
   let sl=null,tp=null,tp2=null;
-  if(cfg.tpsl){let P=plan;if(!(P&&((side==='SHORT'&&P.sl>p)||(side==='LONG'&&P.sl<p)))){const L=S.judge?.L||{p50u:p*1.01,p50d:p*.99,p20u:p*1.02,p20d:p*.98};P=mkPlan(side,p,L,atr(S.kl[cfg.sym+'1h']))}
+  if(cfg.tpsl){let P=plan;if(!(P&&((side==='SHORT'&&P.sl>p)||(side==='LONG'&&P.sl<p)))){const L=(sym===cfg.sym&&S.judge?.L)||{p50u:p*1.01,p50d:p*.99,p20u:p*1.02,p20d:p*.98};P=mkPlan(side,p,L,atr(S.kl[sym+'1h']))}
     sl=P.sl;tp=P.tp;tp2=P.tp2}
   const now=Date.now();
-  const pos={id:now,sym:cfg.sym,side,qty,qty0:qty,entry:p,sl,tp,tp2,sw,adds:sw?[...plan.adds]:null,tpd:sw?plan.tpd:null,maxH:sw?plan.maxH:null,n0:cfg.notional/3,flip:!!(plan&&plan.flip),scale:!!cfg.scale&&!sw&&!(plan&&plan.flip),tp1done:false,open:now,trailed:false,fills:[{kind:'open',act:side==='LONG'?'买':'卖',qty,price:p,notional,fee,pnl:-fee,time:now,note}]};
-  acct.pos[cfg.sym]=pos;acct.balance-=fee;saveAcct();renderAll();toast(`纸面开${side==='LONG'?'多':'空'} ${qty} ${base(cfg.sym)} @ ${fp(p)}`);
+  const pos={id:now,sym,side,qty,qty0:qty,entry:p,sl,tp,tp2,sw,adds:sw?[...plan.adds]:null,tpd:sw?plan.tpd:null,maxH:sw?plan.maxH:null,n0:cfg.notional/3,flip:!!(plan&&plan.flip),scale:!!cfg.scale&&!sw&&!(plan&&plan.flip),tp1done:false,open:now,trailed:false,fills:[{kind:'open',act:side==='LONG'?'买':'卖',qty,price:p,notional,fee,pnl:-fee,time:now,note}]};
+  acct.pos[sym]=pos;acct.balance-=fee;saveAcct();renderAll();toast(`纸面开${side==='LONG'?'多':'空'} ${qty} ${base(sym)} @ ${fps(p,sym)}`);
 }
 function reducePos(sym,frac,note){
-  const pos=acct.pos[sym];if(!pos)return;const p=S.price,q=+(pos.qty*frac).toFixed(4);if(q<=0||q>=pos.qty)return closePos(sym,note);
+  const pos=acct.pos[sym];if(!pos)return;const p=pxOf(sym),q=+(pos.qty*frac).toFixed(4);if(q<=0||q>=pos.qty)return closePos(sym,note);
   const notional=q*p,fee=notional*feeRate(),gross=(pos.side==='LONG'?p-pos.entry:pos.entry-p)*q;
   pos.fills.push({kind:'reduce',act:pos.side==='LONG'?'卖':'买',qty:q,price:p,notional,fee,pnl:gross-fee,time:Date.now(),note});
   pos.qty=+(pos.qty-q).toFixed(4);acct.balance+=gross-fee;saveAcct();renderAll();toast(`${note}：${sg(gross-fee)} USDT`);
 }
 function addPos(pos){
-  const p=S.price,q=+(pos.n0/p).toFixed(4),notional=q*p,fee=notional*feeRate(),sh=pos.side==='SHORT';
+  const p=pxOf(pos.sym),q=+(pos.n0/p).toFixed(4),notional=q*p,fee=notional*feeRate(),sh=pos.side==='SHORT';
   pos.entry=(pos.entry*pos.qty+p*q)/(pos.qty+q);pos.qty=+(pos.qty+q).toFixed(4);if(pos.tpd)pos.tp=pos.tp2=sh?pos.entry-pos.tpd:pos.entry+pos.tpd;
-  pos.fills.push({kind:'add',act:sh?'卖':'买',qty:q,price:p,notional,fee,pnl:-fee,time:Date.now(),note:`第 ${pos.fills.filter(f=>f.kind!=='close'&&f.kind!=='reduce').length+1} 批加仓：均价变为 ${fp(pos.entry)}，止盈 ${pos.tpd?'跟着挪到':'保持在'} ${fp(pos.tp)}`});
-  acct.balance-=fee;saveAcct();renderAll();toast(`纸面加仓 ${q} ${base(pos.sym)} @ ${fp(p)}`);
+  pos.fills.push({kind:'add',act:sh?'卖':'买',qty:q,price:p,notional,fee,pnl:-fee,time:Date.now(),note:`第 ${pos.fills.filter(f=>f.kind!=='close'&&f.kind!=='reduce').length+1} 批加仓：均价变为 ${fps(pos.entry,pos.sym)}，止盈 ${pos.tpd?'跟着挪到':'保持在'} ${fps(pos.tp,pos.sym)}`});
+  acct.balance-=fee;saveAcct();renderAll();toast(`纸面加仓 ${q} ${base(pos.sym)} @ ${fps(p,pos.sym)}`);
 }
 function closePos(sym,note){
-  const pos=acct.pos[sym];if(!pos)return;const p=S.price,notional=pos.qty*p,fee=notional*feeRate();
+  const pos=acct.pos[sym];if(!pos)return;const p=pxOf(sym);if(!p)return;const notional=pos.qty*p,fee=notional*feeRate();
   const gross=(pos.side==='LONG'?p-pos.entry:pos.entry-p)*pos.qty,now=Date.now();
   pos.fills.push({kind:'close',act:pos.side==='LONG'?'卖':'买',qty:pos.qty,price:p,notional,fee,pnl:gross-fee,time:now,note});
   acct.balance+=gross-fee;pos.closed=now;pos.realized=pos.fills.reduce((a,f)=>a+f.pnl,0);
   if(/止损/.test(note)&&!/保本|移动/.test(note)){acct.lastStop=acct.lastStop||{};(acct.lastStop[sym]=acct.lastStop[sym]||{})[pos.side]=now}
   acct.hist.unshift(pos);delete acct.pos[sym];if(acct.hist.length>300)acct.hist.length=300;saveAcct();renderAll();
-  toast(`${note}：${sg(gross-fee)} USDT`);
+  toast(`${base(sym)} ${note}：${sg(gross-fee)} USDT`);
 }
-function checkStops(){
-  const pos=acct&&acct.pos[cfg.sym];if(!pos||pos.sl==null)return;const p=S.price,sh=pos.side==='SHORT';
+function checkStops(){if(!acct)return;for(const sym of Object.keys(acct.pos))checkStopsSym(sym)}
+function checkStopsSym(sym){
+  const pos=acct.pos[sym];if(!pos||pos.sl==null)return;const p=pxOf(sym);if(!p)return;const sh=pos.side==='SHORT';
   if(pos.sw){while(pos.adds&&pos.adds.length&&(sh?p>=pos.adds[0]:p<=pos.adds[0])&&(sh?pos.adds[0]<pos.sl:pos.adds[0]>pos.sl)){pos.adds.shift();addPos(pos)}
-    if(Date.now()-pos.open>pos.maxH*36e5)return closePos(cfg.sym,'超时离场（拿满 3 天）')}
+    if(Date.now()-pos.open>pos.maxH*36e5)return closePos(sym,'超时离场（拿满 3 天）')}
   const hitSL=sh?p>=pos.sl:p<=pos.sl,hit=t=>t!=null&&(sh?p<=t:p>=t);
-  if(hitSL)return closePos(cfg.sym,pos.tp1done?'第二批保本离场':pos.trailed?'移动止损':'自动止损');
+  if(hitSL)return closePos(sym,pos.tp1done?'第二批保本离场':pos.trailed?'移动止损':'自动止损');
   if(pos.scale){
-    if(!pos.tp1done&&hit(pos.tp)){pos.tp1done=true;pos.sl=pos.entry;reducePos(cfg.sym,.5,'分批止盈：先平一半，剩下的止损挪到开仓价');setPriceLines();return}
-    if(pos.tp1done&&hit(pos.tp2))return closePos(cfg.sym,'分批止盈：第二批到 P20');
+    if(!pos.tp1done&&hit(pos.tp)){pos.tp1done=true;pos.sl=pos.entry;reducePos(sym,.5,'分批止盈：先平一半，剩下的止损挪到开仓价');if(sym===cfg.sym)setPriceLines();return}
+    if(pos.tp1done&&hit(pos.tp2))return closePos(sym,'分批止盈：第二批到 P20');
     return;
   }
-  if(hit(pos.tp))return closePos(cfg.sym,'自动止盈');
+  if(hit(pos.tp))return closePos(sym,'自动止盈');
   if(cfg.trail&&!pos.trailed&&pos.tp!=null){const goal=Math.abs(pos.tp-pos.entry),got=sh?pos.entry-p:p-pos.entry;
-    if(got>=goal*.5){pos.sl=sh?pos.entry-goal*.2:pos.entry+goal*.2;pos.trailed=true;saveAcct();setPriceLines();toast('移动止损已挪过开仓价')}}
+    if(got>=goal*.5){pos.sl=sh?pos.entry-goal*.2:pos.entry+goal*.2;pos.trailed=true;saveAcct();if(sym===cfg.sym)setPriceLines();toast('移动止损已挪过开仓价')}}
 }
 
 /* ---------- 回测 ---------- */
@@ -901,7 +907,10 @@ function renderOptimize(){
   const ap=document.getElementById('bApply');if(ap)ap.onclick=()=>{Object.assign(cfg,{mode:best.mode,minScore:best.minScore,hold:best.hold,cool:best.cool,rrMin:best.rrMin,hourly:!!best.hourly});saveCfg();$('#cHourly').checked=cfg.hourly;$('#cMode').value=cfg.mode;
     [['cMin','minScore'],['cHold','hold'],['cCool','cool'],['cRr','rrMin']].forEach(([id,k])=>$('#'+id).value=cfg[k]);runJudge();renderJudge();setPriceLines();renderOptimize();toast('已采用新参数')};
 }
-const floatPnl=pos=>(pos.side==='LONG'?S.price-pos.entry:pos.entry-S.price)*pos.qty;
+const pxOf=sym=>sym===cfg.sym?S.price:(S.px&&S.px[sym])||((S.kl[sym+'15m']||[]).slice(-1)[0]||{}).c||0;
+const fps=(v,sym)=>fmt(v,DP[sym]??2);
+const watchList=()=>cfg.multi?[...new Set([cfg.sym,'ETHUSDT','BTCUSDT'])]:[cfg.sym];
+const floatPnl=pos=>{const p=pxOf(pos.sym);return p?(pos.side==='LONG'?p-pos.entry:pos.entry-p)*pos.qty:0};
 function seedDemoHistory(){
   // marked example trades so the demo review screen is not empty
   const p=DEMO_BASE.ETHUSDT,now=Date.now(),mk=(hAgo,dur,side,e,x,note)=>{const qty=+(400/e).toFixed(4),t0=now-hAgo*36e5,t1=t0+dur*36e5,f0=qty*e*.0005,f1=qty*x*.0005,g=(side==='LONG'?x-e:e-x)*qty;
@@ -1025,7 +1034,7 @@ function spark(vals,w,h,color,fill=true){if(!vals||vals.length<2)return'';const 
   const pts=vals.map((v,i)=>[i/(vals.length-1)*w,h-4-(v-mn)/r*(h-10)]);const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join('');const e=pts[pts.length-1];
   return(fill?`<path d="${d}L${w} ${h}L0 ${h}Z" fill="${color}" fill-opacity=".12"/>`:'')+`<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><circle cx="${e[0]}" cy="${e[1]}" r="3" fill="${color}"/>`}
 function renderEquity(){
-  const fl=Object.values(acct.pos).reduce((a,p)=>a+(p.sym===cfg.sym?floatPnl(p):0),0);
+  const fl=Object.values(acct.pos).reduce((a,p)=>a+floatPnl(p),0);
   $('#equity').textContent=fmt(acct.balance+fl,2);
   const closed=[...acct.hist].reverse();let run=cfg.start;const curve=[cfg.start,...closed.map(h=>run+=h.realized)];curve.push(acct.balance+fl);
   $('#eqSpark').innerHTML=spark(curve,300,64,curve[curve.length-1]>=cfg.start?css('--up'):css('--down'));
@@ -1035,12 +1044,12 @@ function renderEquity(){
 }
 function posCard(pos){const f=floatPnl(pos);return`<div class="fill posbox">
   <div class="l1">${base(pos.sym)} <span style="color:var(--p20)">持仓中</span><span class="pill ${pos.side==='LONG'?'long':'short'}">${pos.side==='LONG'?'多':'空'}</span><span class="t">实时</span></div>
-  <div class="l2"><span class="v">${pos.qty} @ ${fp(pos.entry)}</span>· 现价 ${fp(S.price)} · <span class="${pc(f)}" style="font-weight:700">浮盈 ${sg(f)}</span></div>
-  <div class="l2">止损 ${pos.sl!=null?fp(pos.sl):'—'}${pos.trailed?'（已移动）':''} · 止盈 ${pos.tp!=null?fp(pos.tp):'—'}${pos.scale&&pos.tp2!=null?' / '+fp(pos.tp2):''}${pos.tp1done?'（已平一半）':''} · 保证金 ${fmt(pos.qty*pos.entry/cfg.lev,2)}</div>
+  <div class="l2"><span class="v">${pos.qty} @ ${fps(pos.entry,pos.sym)}</span>· 现价 ${fps(pxOf(pos.sym),pos.sym)} · <span class="${pc(f)}" style="font-weight:700">浮盈 ${sg(f)}</span></div>
+  <div class="l2">止损 ${pos.sl!=null?fps(pos.sl,pos.sym):'—'}${pos.trailed?'（已移动）':''} · 止盈 ${pos.tp!=null?fps(pos.tp,pos.sym):'—'}${pos.scale&&pos.tp2!=null?' / '+fps(pos.tp2,pos.sym):''}${pos.tp1done?'（已平一半）':''} · 保证金 ${fmt(pos.qty*pos.entry/cfg.lev,2)}</div>
   <div class="l3">还没平完，浮盈按现价算，未扣平仓手续费</div></div>`}
 function renderPosCards(){
-  const pos=acct.pos[cfg.sym];
-  $('#ovPos').innerHTML=pos?posCard(pos):`<div class="empty">${base(cfg.sym)} 空仓 · ${cfg.auto?'自动跟判断书开启，等信号':'自动跟单已关闭'}</div>`;
+  const all=Object.values(acct.pos),pos=acct.pos[cfg.sym];
+  $('#ovPos').innerHTML=all.length?all.map(posCard).join('<div style="height:8px"></div>'):`<div class="empty">${watchList().map(base).join(' / ')} 都空仓 · ${cfg.auto?'自动跟判断书开启，等信号':'自动跟单已关闭'}</div>`;
   const hp=document.getElementById('histPos');if(hp)hp.innerHTML=pos?posCard(pos):'';
 }
 function pill(dir,go=true){if(!go&&dir!=='WAIT')return`<span class="pill wait">观望（${dir==='LONG'?'偏多':'偏空'}）</span>`;return`<span class="pill ${dir==='LONG'?'long':dir==='SHORT'?'short':'wait'}">${dir==='LONG'?'做多':dir==='SHORT'?'做空':'观望'}</span>`}
@@ -1101,13 +1110,13 @@ function renderJudge(){renderTools();
   $('#bFollow').textContent=has?'已有持仓':j.go?`按判断书开${j.dir==='LONG'?'多':'空'}（纸面）`:'判断书未达开仓条件';
 }
 function renderHistory(){
-  const groups=[...acct.hist].filter(g=>g.sym===cfg.sym);let html='<div id="histPos"></div>';
+  const groups=[...acct.hist];let html='<div id="histPos"></div>';
   const pos=acct.pos[cfg.sym];
   const block=(g,open)=>{const fees=g.fills.reduce((a,f)=>a+f.fee,0),real=g.fills.reduce((a,f)=>a+(f.kind==='close'||f.kind==='reduce'?f.pnl:-f.fee),0);
     return`<div class="day"><span class="d">${dayLabel(g.open)}</span><span class="num">${hhmm(g.open)} 开仓</span><span class="pill ${g.side==='LONG'?'long':'short'}">${g.side==='LONG'?'多':'空'}</span><span style="color:${open?'var(--p20)':'var(--ink-2)'};font-size:13px">${open?'持仓中':'已平完'}</span><span class="r ${pc(real)}">已实现 ${sg(real)}</span></div>
     <div class="muted" style="font-size:13px;margin-top:-6px">这一笔共 ${g.fills.length} 次成交 · 手续费 ${fmt(fees,2)}${g.demo?' · 示例数据':''}</div>
     ${[...g.fills].reverse().map(f=>`<div class="fill"><div class="l1">${base(g.sym)} <span class="kind-${f.kind}">${{open:'开仓',close:'平仓',reduce:'减仓',add:'加仓'}[f.kind]}</span><span class="${f.act==='买'?'up':'down'}">${f.act}</span><span class="paper">纸面</span><span class="t">${hms(f.time)}</span></div>
-    <div class="l2"><span class="v">${f.qty} @ ${fp(f.price)}</span>· 名义 ${fmt(f.notional,2)} · 费 ${fmt(f.fee,2)} · <b class="${pc(f.pnl)}" style="font-size:15px">${sg(f.pnl)}</b></div><div class="l3">${f.note}</div></div>`).join('')}`};
+    <div class="l2"><span class="v">${f.qty} @ ${fps(f.price,g.sym)}</span>· 名义 ${fmt(f.notional,2)} · 费 ${fmt(f.fee,2)} · <b class="${pc(f.pnl)}" style="font-size:15px">${sg(f.pnl)}</b></div><div class="l3">${f.note}</div></div>`).join('')}`};
   if(pos)html+=block(pos,true);
   groups.forEach(g=>html+=block(g,false));
   if(!pos&&!groups.length)html+=`<div class="empty">${base(cfg.sym)} 还没有纸面成交。打开「判断」页按判断书开一笔，或在配置里开启自动跟单。</div>`;
@@ -1174,7 +1183,7 @@ $('#bLong').onclick=()=>openPos('LONG','手动开多',null);$('#bShort').onclick
 $('#bClose').onclick=()=>closePos(cfg.sym,'手动平仓');
 const binds=[['cNotional','notional'],['cLev','lev'],['cFee','fee'],['cStart','start'],['cMin','minScore'],['cHold','hold'],['cCool','cool'],['cRr','rrMin'],['cRebate','rebate']];
 binds.forEach(([id,k])=>{const el=$('#'+id);el.value=cfg[k];el.onchange=()=>{const v=parseFloat(el.value);if(!isNaN(v)){cfg[k]=v;saveCfg();if(k==='minScore'||k==='hold'){runJudge();renderJudge();setPriceLines()}toast('已保存')}}});
-[['cAuto','auto'],['cTpsl','tpsl'],['cTrail','trail'],['cScale','scale'],['cHourly','hourly']].forEach(([id,k])=>{const el=$('#'+id);el.checked=cfg[k];el.onchange=()=>{cfg[k]=el.checked;saveCfg();renderPosCards();renderJudge();renderBacktest();toast(el.checked?'已开启':'已关闭')}});
+[['cAuto','auto'],['cTpsl','tpsl'],['cTrail','trail'],['cScale','scale'],['cHourly','hourly'],['cMulti','multi']].forEach(([id,k])=>{const el=$('#'+id);el.checked=cfg[k];el.onchange=()=>{cfg[k]=el.checked;saveCfg();renderPosCards();renderJudge();renderBacktest();toast(el.checked?'已开启':'已关闭')}});
 $('#bRetry').onclick=()=>connect();
 let btDays=30;$('#btRange').onclick=e=>{const b=e.target.closest('button');if(!b)return;btDays=+b.dataset.d;document.querySelectorAll('#btRange button').forEach(x=>x.classList.toggle('on',x===b))};
 $('#bBt').onclick=()=>runBacktest(btDays);
@@ -1196,14 +1205,20 @@ try{const ios=/iPhone|iPad|iPod/.test(navigator.userAgent),standalone=navigator.
   if(ios&&!standalone&&!sget('tipClosed',false)&&location.hostname.endsWith('github.io'))$('#installTip').hidden=false}catch(e){}
 $('#tipX').onclick=()=>{$('#installTip').hidden=true;sset('tipClosed',true)};
 
+/* ---------- multi-symbol price poll ---------- */
+async function pollOthers(){if(!S.live)return;S.px=S.px||{};const others=[...new Set([...watchList(),...Object.keys(acct?acct.pos:{})])].filter(x=>x!==cfg.sym);
+  for(const sym of others){try{const r=await getJSON(`${API}${PFX}/ticker/price?symbol=${sym}`,6000);const p=+r.price;if(p>0){S.px[sym]=p;checkStopsSym(sym)}}catch(e){}}
+  if(others.length){renderEquity();renderPosCards()}}
+setInterval(pollOthers,10000);
+
 /* ---------- update check ---------- */
-const MYVER=19;
+const MYVER=20;
 async function checkUpdate(){try{const r=await fetch('index.html?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const m=(await r.text()).match(/第 (\d+) 版/);
   if(m&&+m[1]>MYVER){$('#updTxt').textContent=`有新版本（第 ${m[1]} 版），点这里更新`;$('#updTip').hidden=false;$('#updTip').onclick=()=>location.replace(location.pathname+'?v='+m[1])}}catch(e){}}
 if(location.protocol.startsWith('http')){setTimeout(checkUpdate,8000);setInterval(checkUpdate,5*60e3);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()})}
 
 /* ---------- loops ---------- */
-setInterval(async()=>{try{if(S.live)await Promise.all([klines(cfg.sym,'4h',300),klines(cfg.sym,'1h',800),klines(cfg.sym,'15m',300),klines(cfg.sym,'5m',150),klines(cfg.sym,'1m',150)]);S.toolsAt=0;runJudge();autoTrade();renderJudge();setPriceLines()}catch(e){}},60000);
+setInterval(async()=>{try{if(S.live){await Promise.all([klines(cfg.sym,'4h',300),klines(cfg.sym,'1h',800),klines(cfg.sym,'15m',300),klines(cfg.sym,'5m',150),klines(cfg.sym,'1m',150)]);for(const x of watchList())if(x!==cfg.sym)await Promise.all([klines(x,'4h',300),klines(x,'1h',800),klines(x,'15m',300)])}S.toolsAt=0;runJudge();autoTrade();renderJudge();setPriceLines()}catch(e){}},60000);
 setInterval(()=>loadSenti(),300000);
 
 show(cfg.view);
