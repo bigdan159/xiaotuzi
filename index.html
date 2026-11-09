@@ -231,7 +231,7 @@ a{color:var(--accent)}
   <header class="top">
     <div class="symrow">
       <select class="symsel" id="sym" aria-label="合约">
-        <option value="ETHUSDT">ETHUSDT</option><option value="BTCUSDT">BTCUSDT</option><option value="SOLUSDT">SOLUSDT</option>
+        <option value="ETHUSDT">ETHUSDT</option><option value="BTCUSDT">BTCUSDT</option><option value="SOLUSDT">SOLUSDT</option><option value="BNBUSDT">BNBUSDT</option><option value="XRPUSDT">XRPUSDT</option><option value="DOGEUSDT">DOGEUSDT</option>
       </select>
       <span class="tag">永续</span>
       <span class="status" id="status"><span class="dot" id="dot"></span><span id="statusTxt">连接中…</span></span>
@@ -326,7 +326,7 @@ a{color:var(--accent)}
     <div class="card">
       <h2 class="h2">自动找更好的参数</h2>
       <div class="note" style="margin-top:6px">把区间回归、4 小时趋势、顺势做反弹、参考复刻、自动切换几种策略，和不同的开仓线、持仓窗口、过滤条件（含「只在整点判断」）组合起来，一共 63 组，各回测一遍。用前 60 天挑参数，后 30 天检验，防止挑到只是碰巧好看的参数。大约要 1～2 分钟。可以分别在 ETH 和 BTC 上跑，两个都赚的规则才更可信。</div>
-      <div class="seg" id="optSym" style="margin-top:12px"><button data-s="ETHUSDT">ETH</button><button data-s="BTCUSDT">BTC</button><button data-s="SOLUSDT">SOL</button></div>
+      <div class="seg" id="optSym" style="margin-top:12px"><button data-s="ETHUSDT">ETH</button><button data-s="BTCUSDT">BTC</button><button data-s="SOLUSDT">SOL</button><button data-s="BNBUSDT">BNB</button></div>
       <div class="btnrow" style="margin-top:12px"><button class="btn primary" id="bOpt">开始寻找</button></div>
       <div id="optOut" style="margin-top:12px;display:flex;flex-direction:column;gap:12px"></div>
     </div>
@@ -378,7 +378,9 @@ a{color:var(--accent)}
       <div class="field"><label for="cMin">最低开仓评分<small>判断书评分达到才开仓</small></label><input type="number" id="cMin" min="0" max="100" step="5"></div>
       <div class="field"><label for="cHold">持仓窗口（小时）<small>决定 P50 / P20 区间宽度</small></label><input type="number" id="cHold" min="1" max="48" step="1"></div>
       <div class="field"><label for="cAuto">自动跟判断书开平仓<small>每分钟检查一次，只在纸面执行</small></label><input type="checkbox" class="switch" id="cAuto"></div>
-      <div class="field"><label for="cMulti">同时盯 ETH 和 BTC<small>两个币各自按同样的规则判断、各自开单，纸面账户合在一起算</small></label><input type="checkbox" class="switch" id="cMulti"></div>
+      <div class="field"><label for="cMulti">同时盯多个币<small>每个币各自按同样的规则判断、各自开单，纸面账户合在一起算。币越多机会越多，影子判断的样本也越快攒够；但各币经常一起涨跌，所以下面限制同时最多开几单</small></label><input type="checkbox" class="switch" id="cMulti"></div>
+      <div class="seg" id="cSyms" style="margin:0 0 12px"><button data-s="ETHUSDT">ETH</button><button data-s="BTCUSDT">BTC</button><button data-s="SOLUSDT">SOL</button><button data-s="BNBUSDT">BNB</button><button data-s="XRPUSDT">XRP</button><button data-s="DOGEUSDT">DOGE</button></div>
+      <div class="field"><label for="cMaxPos">同时最多持仓（单）<small>已经有这么多单在手时，新信号不再开仓，避免几个币一起反向时亏得太多</small></label><input type="number" id="cMaxPos" min="1" max="6" step="1"></div>
       <div class="field"><label for="cHourly">只在整点判断开仓<small>等 1 小时 K 线收盘后（整点 5 分钟内）才判断一次，不追没走完的急涨急跌；止盈止损照常实时盯</small></label><input type="checkbox" class="switch" id="cHourly"></div>
       <div class="field"><label for="cTpsl">自动止盈止损<small>止盈 P50 对侧，止损 P50 外侧</small></label><input type="checkbox" class="switch" id="cTpsl"></div>
       <div class="field"><label for="cTrail">移动止损<small>浮盈到目标一半时把止损挪过开仓价（不分批时生效）</small></label><input type="checkbox" class="switch" id="cTrail"></div>
@@ -403,7 +405,7 @@ a{color:var(--accent)}
       </ol>
     </div>
     <div class="card">
-      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-08 · 第 21 版</span></h2>
+      <h2 class="h2">账户 <span class="label" style="margin-left:auto">App 版本 11-09 · 第 22 版</span></h2>
       <div class="btnrow" style="margin-top:10px"><button class="btn danger" id="bReset" style="grid-column:1/-1">重置纸面账户</button></div>
     </div>
   </section>
@@ -428,13 +430,13 @@ const TFS=[['1m','1分'],['5m','5分'],['15m','15分'],['1h','1小时'],['4h','4
 const TF_SEC={'1m':60,'5m':300,'15m':900,'1h':3600,'4h':14400,'1d':86400,'1w':604800,'1M':2592000};
 const TZ=-new Date().getTimezoneOffset()*60;
 const VIEWS={overview:'总览',judge:'判断书',sentiment:'舆情',history:'K线走势与点位复盘',config:'配置'};
-const DEMO_BASE={ETHUSDT:2300,BTCUSDT:68000,SOLUSDT:160};
-const DP={ETHUSDT:2,BTCUSDT:1,SOLUSDT:3};
+const DEMO_BASE={ETHUSDT:2300,BTCUSDT:68000,SOLUSDT:160,BNBUSDT:620,XRPUSDT:2.2,DOGEUSDT:0.17};
+const DP={ETHUSDT:2,BTCUSDT:1,SOLUSDT:3,BNBUSDT:2,XRPUSDT:4,DOGEUSDT:5};
 
 function sget(k,d){try{const v=localStorage.getItem('pj_'+k);return v?JSON.parse(v):d}catch(e){return d}}
 function sset(k,v){try{localStorage.setItem('pj_'+k,JSON.stringify(v))}catch(e){}}
 
-const cfg=Object.assign({sym:'ETHUSDT',tf:'1h',view:'overview',notional:400,lev:10,fee:0.05,start:1000,minScore:60,hold:4,auto:true,tpsl:true,trail:true,scale:true,cool:0,rrMin:0,rebate:0,mode:'trend',hourly:false,multi:true},sget('cfg',{}));
+const cfg=Object.assign({sym:'ETHUSDT',tf:'1h',view:'overview',notional:400,lev:10,fee:0.05,start:1000,minScore:60,hold:4,auto:true,tpsl:true,trail:true,scale:true,cool:0,rrMin:0,rebate:0,mode:'trend',hourly:false,multi:true,syms:['ETHUSDT','BTCUSDT','SOLUSDT','BNBUSDT'],maxPos:3},sget('cfg',{}));
 const S={src:'demo',diag:[],live:false,kl:{},price:0,chg:0,judge:null,senti:null,ws:null,demoP:{...DEMO_BASE},lastAuto:0};
 let acct=null;
 function acctKey(){return 'acct_'+(S.live?'live':'demo')}
@@ -807,7 +809,7 @@ function autoTradeSym(sym){
   const ok=j.go&&passFilter(j.dir,j.plan,Date.now(),(acct.lastStop||{})[sym],cfg);logCheck(j,ok,sym);
   if(pos&&ok&&j.dir!==pos.side){closePos(sym,'判断书反向信号');}
   else if(pos&&pos.flip&&j.dir!==pos.side){closePos(sym,'判断书不再支持：'+(((j.items||[]).find(x=>x.s==='bad')||{}).t||'方向变了'))}
-  if(!acct.pos[sym]&&ok&&Date.now()-(S.lastAutoBy[sym]||0)>15*60e3){S.lastAutoBy[sym]=Date.now();openPos(j.dir,'判断书趋势 '+j.dir+'：'+j.items.filter(x=>x.s!=='bad').map(x=>x.t).join('；'),j.plan,sym)}
+  if(!acct.pos[sym]&&ok&&Object.keys(acct.pos).length<(cfg.maxPos||99)&&Date.now()-(S.lastAutoBy[sym]||0)>15*60e3){S.lastAutoBy[sym]=Date.now();openPos(j.dir,'判断书趋势 '+j.dir+'：'+j.items.filter(x=>x.s!=='bad').map(x=>x.t).join('；'),j.plan,sym)}
 }
 
 /* ---------- paper engine ---------- */
@@ -959,7 +961,7 @@ function renderOptimize(){
 }
 const pxOf=sym=>sym===cfg.sym?S.price:(S.px&&S.px[sym])||((S.kl[sym+'15m']||[]).slice(-1)[0]||{}).c||0;
 const fps=(v,sym)=>fmt(v,DP[sym]??2);
-const watchList=()=>cfg.multi?[...new Set([cfg.sym,'ETHUSDT','BTCUSDT'])]:[cfg.sym];
+const watchList=()=>cfg.multi?[...new Set([cfg.sym,...(cfg.syms||['ETHUSDT','BTCUSDT'])])]:[cfg.sym];
 const floatPnl=pos=>{const p=pxOf(pos.sym);return p?(pos.side==='LONG'?p-pos.entry:pos.entry-p)*pos.qty:0};
 function seedDemoHistory(){
   // marked example trades so the demo review screen is not empty
@@ -1027,7 +1029,7 @@ function setMarkers(){
 /* ---------- sentiment ---------- */
 async function loadCoinCards(){
   const out=[];
-  for(const sym of ['ETHUSDT','BTCUSDT']){try{
+  for(const sym of watchList()){try{
     let j;if(sym===cfg.sym&&S.judge)j=S.judge;else{const [k4,k1,k15]=await Promise.all([klines(sym,'4h',300),klines(sym,'1h',800),klines(sym,'15m',300)]);j=judgeCore(k4,k1,k15,k15[k15.length-1].c)}
     out.push({sym,j})}catch(e){out.push({sym,j:null})}}
   $('#coinCards').innerHTML=out.map(({sym,j})=>{if(!j)return`<div class="card coin"><div class="t">${base(sym)}</div><div class="r">暂时取不到</div></div>`;
@@ -1234,9 +1236,13 @@ $('#sym').value=cfg.sym;$('#sym').onchange=e=>{cfg.sym=e.target.value;saveCfg();
 $('#bFollow').onclick=()=>{const j=S.judge;if(j&&j.go)openPos(j.dir,'判断书趋势 '+j.dir+'（手动确认）：'+j.items.filter(x=>x.s!=='bad').map(x=>x.t).join('；'),j.plan)};
 $('#bLong').onclick=()=>openPos('LONG','手动开多',null);$('#bShort').onclick=()=>openPos('SHORT','手动开空',null);
 $('#bClose').onclick=()=>closePos(cfg.sym,'手动平仓');
-const binds=[['cNotional','notional'],['cLev','lev'],['cFee','fee'],['cStart','start'],['cMin','minScore'],['cHold','hold'],['cCool','cool'],['cRr','rrMin'],['cRebate','rebate']];
+const binds=[['cNotional','notional'],['cLev','lev'],['cFee','fee'],['cStart','start'],['cMin','minScore'],['cHold','hold'],['cCool','cool'],['cMaxPos','maxPos'],['cRr','rrMin'],['cRebate','rebate']];
 binds.forEach(([id,k])=>{const el=$('#'+id);el.value=cfg[k];el.onchange=()=>{const v=parseFloat(el.value);if(!isNaN(v)){cfg[k]=v;saveCfg();if(k==='minScore'||k==='hold'){runJudge();renderJudge();setPriceLines()}toast('已保存')}}});
 [['cAuto','auto'],['cTpsl','tpsl'],['cTrail','trail'],['cScale','scale'],['cHourly','hourly'],['cMulti','multi']].forEach(([id,k])=>{const el=$('#'+id);el.checked=cfg[k];el.onchange=()=>{cfg[k]=el.checked;saveCfg();renderPosCards();renderJudge();renderBacktest();toast(el.checked?'已开启':'已关闭')}});
+const markSyms=()=>document.querySelectorAll('#cSyms button').forEach(x=>x.classList.toggle('on',cfg.syms.includes(x.dataset.s)));markSyms();
+$('#cSyms').onclick=e=>{const b=e.target.closest('button');if(!b)return;const sy=b.dataset.s,i=cfg.syms.indexOf(sy);
+  if(i>=0){if(cfg.syms.length<=1){toast('至少留一个币');return}if(acct.pos[sy]){toast(base(sy)+' 还有持仓，先平仓再取消');return}cfg.syms.splice(i,1)}else cfg.syms.push(sy);
+  saveCfg();markSyms();pollOthers();Promise.all(watchList().filter(x=>x!==cfg.sym).map(x=>Promise.all([klines(x,'4h',300),klines(x,'1h',800),klines(x,'15m',300)]))).then(()=>{loadCoinCards();renderShadow()}).catch(()=>{});toast('已保存')};
 $('#bRetry').onclick=()=>connect();
 let btDays=30;$('#btRange').onclick=e=>{const b=e.target.closest('button');if(!b)return;btDays=+b.dataset.d;document.querySelectorAll('#btRange button').forEach(x=>x.classList.toggle('on',x===b))};
 $('#bBt').onclick=()=>runBacktest(btDays);
@@ -1265,7 +1271,7 @@ async function pollOthers(){if(!S.live)return;S.px=S.px||{};const others=[...new
 setInterval(pollOthers,10000);
 
 /* ---------- update check ---------- */
-const MYVER=21;
+const MYVER=22;
 async function checkUpdate(){try{const r=await fetch('index.html?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const m=(await r.text()).match(/第 (\d+) 版/);
   if(m&&+m[1]>MYVER){$('#updTxt').textContent=`有新版本（第 ${m[1]} 版），点这里更新`;$('#updTip').hidden=false;$('#updTip').onclick=()=>location.replace(location.pathname+'?v='+m[1])}}catch(e){}}
 if(location.protocol.startsWith('http')){setTimeout(checkUpdate,8000);setInterval(checkUpdate,5*60e3);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()})}
